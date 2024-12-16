@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "*.tf": "terraform",
+        "*.rs": "rust",
+        "*.v": "vernacular",
+        "syntaxes.h": "c"
+    }
+}
