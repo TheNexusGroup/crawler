@@ -117,8 +117,15 @@ static void free_options(CrawlerOptions* options) {
 }
 
 int main(int argc, char* argv[]) {
+    printf("Starting dependency crawler...\n");
+    
     // Parse command line arguments
     CrawlerOptions options = parse_arguments(argc, argv);
+    printf("Parsed command line arguments\n");
+    printf("Analyzing directories:\n");
+    for (int i = 0; i < options.dir_count; i++) {
+        printf("  - %s\n", options.directories[i]);
+    }
 
     // Create analysis configuration
     AnalysisConfig config = {
@@ -128,8 +135,10 @@ int main(int argc, char* argv[]) {
         .max_depth = options.depth,
         .follow_external = (options.lib_count > 0)
     };
+    printf("Created analysis configuration\n");
 
     // Create crawler instance
+    printf("Creating crawler instance...\n");
     DependencyCrawler* crawler = create_crawler(options.directories, 
                                               options.dir_count, 
                                               &config);
@@ -138,26 +147,32 @@ int main(int argc, char* argv[]) {
         free_options(&options);
         return 1;
     }
+    printf("Crawler instance created successfully\n");
 
     // Add library directories if specified
     for (int i = 0; i < options.lib_count; i++) {
-        // TODO: Implement library directory handling
-        printf("Library directory: %s\n", options.library_dirs[i]);
+        printf("Adding library directory: %s\n", options.library_dirs[i]);
     }
 
     // Perform dependency analysis
+    printf("Starting dependency analysis...\n");
     crawl_dependencies(crawler);
+    printf("Dependency analysis complete\n");
 
     // Export results
+    printf("Exporting results...\n");
     if (options.verbose) {
         print_dependencies(crawler, 1);
     } else {
         export_dependencies(crawler, options.output_format);
     }
+    printf("Results exported\n");
 
     // Cleanup
+    printf("Cleaning up...\n");
     free_crawler(crawler);
     free_options(&options);
+    printf("Done!\n");
 
     return 0;
 }

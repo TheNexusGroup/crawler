@@ -29,19 +29,14 @@ typedef enum {
     LANG_SVELTE,
 } LanguageType;
 
+const char* languageName(LanguageType type);
+
 // Layer definitions for granular analysis
 typedef enum {
     LAYER_MODULE,    // First layer: modules, files, packages
     LAYER_STRUCT,    // Second layer: classes, structs, traits
     LAYER_METHOD     // Third layer: methods, functions, parameters
 } AnalysisLayer;
-
-// Update DependencyLevel to match AnalysisLayer
-typedef enum {
-    DEP_MODULE = LAYER_MODULE,
-    DEP_STRUCT = LAYER_STRUCT,
-    DEP_METHOD = LAYER_METHOD
-} DependencyLevel;
 
 // Parameter structure
 typedef struct {
@@ -50,43 +45,11 @@ typedef struct {
     char* default_value;
 } Parameter;
 
-// Method structure
-typedef struct {
-    char* name;
-    char* return_type;
-    Parameter parameters[MAX_PARAMETERS];
-    int param_count;
-} Method;
-
-// Structure definition
-typedef struct {
-    char* name;
-    Method* methods;
-    int method_count;
-    char** implemented_traits;
-    int trait_count;
-    char** dependencies;
-    int dependency_count;
-} Structure;
-
-// Flexible dependency struct to capture relationships
-typedef struct Dependency {
-    char* source;
-    char* target;
-    DependencyLevel level;
-    LanguageType language;
-    struct Dependency* next;
-} Dependency;
-
-
-
-// Language-specific syntax patterns for each layer
-typedef struct {
-    const char* patterns[MAX_MATCHES];
-    int pattern_count;
-    regex_t* compiled_patterns;
-    AnalysisLayer layer;
-} SyntaxPatterns;
+// Forward declarations first
+typedef struct Method Method;
+typedef struct Structure Structure;
+typedef struct ExtractedDependency ExtractedDependency;
+typedef struct Dependency Dependency;
 
 // Enhanced dependency features
 typedef struct {
@@ -109,27 +72,57 @@ typedef struct {
     int has_default_impl;
 } DependencyFeatures;
 
-// Enhanced dependency extraction
-typedef struct {
-    // Basic info
-    char* module_name;
-    char* file_path;
-    
-    // Structural info
-    Structure* structures;
-    int structure_count;
-    
-    // Method info
+// Then the full struct definitions
+typedef struct Method {
+    char* name;
+    char* return_type;
+    Parameter parameters[MAX_PARAMETERS];
+    int param_count;
+    char* dependencies;
+    int dependency_count;
+    Method* next;
+} Method;
+
+typedef struct Structure {
+    char* name;
     Method* methods;
     int method_count;
-    
-    // Features
+    char** implemented_traits;
+    int trait_count;
+    char* dependencies;
+    int dependency_count;
+    Structure* next;
+} Structure;
+
+typedef struct ExtractedDependency {
+    char* module_name;
+    char* file_path;
+    Structure* structures;
+    int structure_count;
+    Method* methods;
+    int method_count;
     DependencyFeatures features;
-    
-    // Analysis metadata
     AnalysisLayer layer;
     int depth;
+    char* target;
+    ExtractedDependency* next;
 } ExtractedDependency;
+
+typedef struct Dependency {
+    char* source;
+    char* target;
+    AnalysisLayer level;
+    LanguageType language;
+    Dependency* next;
+} Dependency;
+
+// Language-specific syntax patterns for each layer
+typedef struct {
+    const char* patterns[MAX_MATCHES];
+    int pattern_count;
+    regex_t* compiled_patterns;
+    AnalysisLayer layer;
+} SyntaxPatterns;
 
 // Configuration for analysis depth
 typedef struct {
@@ -170,5 +163,9 @@ typedef struct {
 // Function prototypes for graph generation
 DependencyGraph* create_dependency_graph(ExtractedDependency** deps, int dep_count);
 void export_graph(DependencyGraph* graph, const char* format, const char* output_path);
+void free_structures(Structure* structs);
+void free_methods(Method* methods);
+void free_dependency(ExtractedDependency* dep);
+
 
 #endif // SYNTAXES_H

@@ -125,7 +125,7 @@ DependencyGraph* create_dependency_graph(ExtractedDependency** deps, int dep_cou
             for (int k = 0; k < structure->dependency_count; k++) {
                 Relationship* rel = malloc(sizeof(Relationship));
                 rel->from = strdup(structure->name);
-                rel->to = strdup(structure->dependencies[k]);
+                rel->to = strdup(structure->dependencies);
                 rel->relationship_type = strdup("depends_on");
                 rel->layer = LAYER_STRUCT;
                 graph->relationships[graph->relationship_count++] = rel;
@@ -168,4 +168,85 @@ void export_graph(DependencyGraph* graph, const char* format, const char* output
     }
 
     fclose(output);
+}
+
+const char* languageName(LanguageType type) {
+    switch (type) {
+        case LANG_RUST: return "Rust";
+        case LANG_C: return "C";
+        case LANG_JAVASCRIPT: return "JavaScript";
+        case LANG_GO: return "Go";
+        case LANG_PYTHON: return "Python";
+        case LANG_JAVA: return "Java";
+        case LANG_PHP: return "PHP";
+        case LANG_RUBY: return "Ruby";
+        case LANG_SVELTE: return "Svelte";
+        default: return "Unknown";
+    }
+}
+
+void free_structures(Structure* structs) {
+    while (structs) {
+        Structure* next = structs->next;
+        
+        // Free the structure name
+        free(structs->name);
+        
+        // Free methods
+        if (structs->methods) {
+            for (int i = 0; i < structs->method_count; i++) {
+                free(structs->methods[i].name);
+                free(structs->methods[i].return_type);
+                
+                // Free parameters
+                for (int j = 0; j < structs->methods[i].param_count; j++) {
+                    free(structs->methods[i].parameters[j].name);
+                    free(structs->methods[i].parameters[j].type);
+                    free(structs->methods[i].parameters[j].default_value);
+                }
+                
+                free(structs->methods[i].dependencies);
+            }
+            free(structs->methods);
+        }
+        
+        // Free implemented traits
+        if (structs->implemented_traits) {
+            for (int i = 0; i < structs->trait_count; i++) {
+                free(structs->implemented_traits[i]);
+            }
+            free(structs->implemented_traits);
+        }
+        
+        // Free dependencies
+        free(structs->dependencies);
+        
+        // Free the structure itself
+        free(structs);
+        structs = next;
+    }
+}
+
+void free_methods(Method* methods) {
+    while (methods) {
+        Method* next = methods->next;
+        
+        // Free method name and return type
+        free(methods->name);
+        free(methods->return_type);
+        
+        // Free parameters
+        for (int i = 0; i < methods->param_count; i++) {
+            free(methods->parameters[i].name);
+            free(methods->parameters[i].type);
+            free(methods->parameters[i].default_value);
+        }
+        
+        // Free dependencies
+        free(methods->dependencies);
+        
+        // Free the method itself
+        free(methods);
+        methods = next;
+    }
 }
