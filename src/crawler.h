@@ -2,6 +2,7 @@
 #define CRAWLER_H
 
 #include "syntaxes.h"
+#include "syntax_map.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,9 +10,6 @@
 // Enhanced Language Parser interface
 typedef struct {
     LanguageType type;
-    const char** module_patterns;
-    const char** struct_patterns;
-    const char** method_patterns;
     ExtractedDependency* (*analyze_module)(const char* content);
     Structure* (*analyze_structure)(const char* content);
     Method* (*analyze_method)(const char* content);
@@ -28,7 +26,7 @@ typedef struct {
     DependencyGraph* result_graph;
 } DependencyCrawler;
 
-// Enhanced function prototypes
+// Function prototypes
 DependencyCrawler* create_crawler(char** dirs, int dir_count, AnalysisConfig* config);
 void register_language_parser(DependencyCrawler* crawler, LanguageType type, 
                             const LanguageParser* parser);

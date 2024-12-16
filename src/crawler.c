@@ -5,7 +5,7 @@
 
 // Initialize pattern cache at startup
 static void init_crawler_patterns(void) {
-    if (initialize_pattern_cache() != 0) {
+    if (initPatternCache() != 0) {
         fprintf(stderr, "Failed to initialize pattern cache\n");
         exit(1);
     }
@@ -19,13 +19,35 @@ static int has_extension(const char* filename, const char* ext) {
 
 // Helper function to determine language type from file extension
 static LanguageType get_language_type(const char* filename) {
-    if (has_extension(filename, "rs")) return LANG_RUST;
-    if (has_extension(filename, "c")) return LANG_C;
-    if (has_extension(filename, "cpp")) return LANG_CPP;
-    if (has_extension(filename, "js")) return LANG_JAVASCRIPT;
-    if (has_extension(filename, "go")) return LANG_GO;
-    if (has_extension(filename, "py")) return LANG_PYTHON;
-    return -1;
+    static const struct {
+        const char* ext;
+        LanguageType type;
+    } extension_map[] = {
+        {"rs", LANG_RUST},
+        {"c", LANG_C},
+        {"h", LANG_C}, 
+        {"cpp", LANG_C},
+        {"hpp", LANG_C},
+        {"hxx", LANG_C},
+        {"cxx", LANG_C},
+        {"ts", LANG_JAVASCRIPT},
+        {"js", LANG_JAVASCRIPT},
+        {"go", LANG_GO},
+        {"py", LANG_PYTHON}, 
+        {"java", LANG_JAVA},
+        {"php", LANG_PHP},
+        {"rb", LANG_RUBY},
+        {"svelte", LANG_SVELTE}
+    };
+    
+    // Loop through the lookup table once
+    for (size_t i = 0; i < sizeof(extension_map) / sizeof(extension_map[0]); i++) {
+        if (has_extension(filename, extension_map[i].ext)) {
+            return extension_map[i].type;
+        }
+    }
+
+    return (LanguageType)-1;
 }
 
 // Create a new dependency node
@@ -73,40 +95,68 @@ DependencyCrawler* create_crawler(char** dirs, int dir_count, AnalysisConfig* co
 
 // Register a language-specific parser
 void register_language_parser(DependencyCrawler* crawler, LanguageType type,
-                            Dependency* (*parser_func)(const char*)) {
+                            const LanguageParser* parser) {
     crawler->parser_count++;
     crawler->parsers = (LanguageParser*)realloc(crawler->parsers, 
                                                sizeof(LanguageParser) * crawler->parser_count);
     
     crawler->parsers[crawler->parser_count - 1].type = type;
-    crawler->parsers[crawler->parser_count - 1].parse_dependencies = parser_func;
+    crawler->parsers[crawler->parser_count - 1].analyze_module = parser->analyze_module;
+    crawler->parsers[crawler->parser_count - 1].analyze_structure = parser->analyze_structure;
+    crawler->parsers[crawler->parser_count - 1].analyze_method = parser->analyze_method;
 }
 
 // Process file content based on analysis layer
-static void process_layer(DependencyCrawler* crawler, const char* filepath, 
-                         const LanguagePlugin* plugin, AnalysisLayer layer) {
-    const CompiledPatterns* patterns = get_compiled_patterns(plugin->type, layer);
-    if (!patterns) return;
+static void process_layer(DependencyCrawler* crawler, const char* filepath,
+                         const char* content, AnalysisLayer layer) {
+    LanguageType lang = get_language_type(filepath);
+    if (lang < 0) return;
 
+    // Find the appropriate parser
+    LanguageParser* parser = NULL;
+    for (int i = 0; i < crawler->parser_count; i++) {
+        if (crawler->parsers[i].type == lang) {
+            parser = &crawler->parsers[i];
+            break;
+        }
+    }
+
+    if (!parser) return;
+
+    ExtractedDependency* deps = NULL;
     switch (layer) {
         case LAYER_MODULE:
-            if (crawler->analysis_config.analyze_modules) {
-                ExtractedDependency* deps = plugin->analyze_module(filepath);
-                // Process module dependencies...
+            if (parser->analyze_module) {
+                deps = parser->analyze_module(content);
+                if (deps) {
+                    // Process module dependencies
+                    // TODO: Add to dependency graph
+                    free_dependency(deps);
+                }
             }
             break;
-            
+
         case LAYER_STRUCT:
-            if (crawler->analysis_config.analyze_structures) {
-                Structure* structs = plugin->analyze_structure(filepath);
-                // Process structure dependencies...
+            if (parser->analyze_structure) {
+                Structure* structs = parser->analyze_structure(content);
+                if (structs) {
+                    // Process structure dependencies
+                    // TODO: Add to dependency graph
+                    // TODO: Implement structure cleanup
+                    free(structs);
+                }
             }
             break;
-            
+
         case LAYER_METHOD:
-            if (crawler->analysis_config.analyze_methods) {
-                Method* methods = plugin->analyze_method(filepath);
-                // Process method dependencies...
+            if (parser->analyze_method) {
+                Method* methods = parser->analyze_method(content);
+                if (methods) {
+                    // Process method dependencies
+                    // TODO: Add to dependency graph
+                    // TODO: Implement method cleanup
+                    free(methods);
+                }
             }
             break;
     }
@@ -114,25 +164,38 @@ static void process_layer(DependencyCrawler* crawler, const char* filepath,
 
 // Process a single file
 static void process_file(DependencyCrawler* crawler, const char* filepath) {
-    LanguageType lang = get_language_type(filepath);
-    if (lang == -1) return;
+    // Read file content
+    FILE* file = fopen(filepath, "r");
+    if (!file) return;
+
+    // Get file size
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    rewind(file);
+
+    // Read content
+    char* content = malloc(size + 1);
+    if (!content) {
+        fclose(file);
+        return;
+    }
+
+    size_t read_size = fread(content, 1, size, file);
+    content[read_size] = '\0';
+    fclose(file);
 
     // Process each layer according to configuration
     if (crawler->analysis_config.analyze_modules) {
-        ExtractedDependency* deps = analyze_dependencies(filepath, lang, LAYER_MODULE);
-        // Process results...
-        free_dependency(deps);
+        process_layer(crawler, filepath, content, LAYER_MODULE);
     }
     if (crawler->analysis_config.analyze_structures) {
-        ExtractedDependency* deps = analyze_dependencies(filepath, lang, LAYER_STRUCT);
-        // Process results...
-        free_dependency(deps);
+        process_layer(crawler, filepath, content, LAYER_STRUCT);
     }
     if (crawler->analysis_config.analyze_methods) {
-        ExtractedDependency* deps = analyze_dependencies(filepath, lang, LAYER_METHOD);
-        // Process results...
-        free_dependency(deps);
+        process_layer(crawler, filepath, content, LAYER_METHOD);
     }
+
+    free(content);
 }
 
 // Recursively crawl directories
@@ -197,7 +260,7 @@ void export_dependencies(DependencyCrawler* crawler, const char* output_format) 
 
 // Clean up resources
 void free_crawler(DependencyCrawler* crawler) {
-    cleanup_pattern_cache();
+    cleanPatternCache();
     
     for (int i = 0; i < crawler->directory_count; i++) {
         free(crawler->root_directories[i]);

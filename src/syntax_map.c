@@ -1,101 +1,55 @@
 #include "syntax_map.h"
+#include <string.h>
 
-// Optimized lookup function
-static inline const LanguagePlugin* get_language_plugin(LanguageType type) {
-    for (size_t i = 0; i < LANGUAGE_PLUGIN_COUNT; i++) {
-        if (LANGUAGE_PLUGINS[i].type == type) {
-            return &LANGUAGE_PLUGINS[i];
-        }
-    }
-    return NULL;
-}
-
-// Initialize patterns for all languages
-static inline int initialize_pattern_cache(void) {
-    if (pattern_cache.initialized) return 0;
-
-    for (size_t i = 0; i < LANGUAGE_PLUGIN_COUNT; i++) {
-        const LanguagePlugin* plugin = &LANGUAGE_PLUGINS[i];
-        
-        // Compile module patterns
-        pattern_cache.module_patterns[i].compiled_patterns = 
-            malloc(sizeof(regex_t) * plugin->module_pattern_count);
-        pattern_cache.module_patterns[i].pattern_count = plugin->module_pattern_count;
-        
-        for (size_t j = 0; j < plugin->module_pattern_count; j++) {
-            if (regcomp(&pattern_cache.module_patterns[i].compiled_patterns[j],
-                       plugin->module_patterns[j], REG_EXTENDED) != 0) {
-                return -1;
+void free_dependency(ExtractedDependency* dep) {
+    if (!dep) return;
+    
+    free(dep->module_name);
+    free(dep->file_path);
+    
+    // Free structures
+    for (int i = 0; i < dep->structure_count; i++) {
+        // Free methods within structures
+        for (int j = 0; j < dep->structures[i].method_count; j++) {
+            free(dep->structures[i].methods[j].name);
+            free(dep->structures[i].methods[j].return_type);
+            // Free parameters
+            for (int k = 0; k < dep->structures[i].methods[j].param_count; k++) {
+                free(dep->structures[i].methods[j].parameters[k].name);
+                free(dep->structures[i].methods[j].parameters[k].type);
+                free(dep->structures[i].methods[j].parameters[k].default_value);
             }
+            free(dep->structures[i].methods[j].parameters);
         }
-
-        // Compile struct patterns
-        pattern_cache.struct_patterns[i].compiled_patterns = 
-            malloc(sizeof(regex_t) * plugin->struct_pattern_count);
-        pattern_cache.struct_patterns[i].pattern_count = plugin->struct_pattern_count;
+        free(dep->structures[i].methods);
+        free(dep->structures[i].name);
         
-        for (size_t j = 0; j < plugin->struct_pattern_count; j++) {
-            if (regcomp(&pattern_cache.struct_patterns[i].compiled_patterns[j],
-                       plugin->struct_patterns[j], REG_EXTENDED) != 0) {
-                return -1;
-            }
+        // Free implemented traits
+        for (int j = 0; j < dep->structures[i].trait_count; j++) {
+            free(dep->structures[i].implemented_traits[j]);
         }
-
-        // Compile method patterns
-        pattern_cache.method_patterns[i].compiled_patterns = 
-            malloc(sizeof(regex_t) * plugin->method_pattern_count);
-        pattern_cache.method_patterns[i].pattern_count = plugin->method_pattern_count;
+        free(dep->structures[i].implemented_traits);
         
-        for (size_t j = 0; j < plugin->method_pattern_count; j++) {
-            if (regcomp(&pattern_cache.method_patterns[i].compiled_patterns[j],
-                       plugin->method_patterns[j], REG_EXTENDED) != 0) {
-                return -1;
-            }
+        // Free dependencies
+        for (int j = 0; j < dep->structures[i].dependency_count; j++) {
+            free(dep->structures[i].dependencies[j]);
         }
+        free(dep->structures[i].dependencies);
     }
-
-    pattern_cache.initialized = 1;
-    return 0;
-}
-
-// Clean up pattern cache
-static inline void cleanup_pattern_cache(void) {
-    if (!pattern_cache.initialized) return;
-
-    for (size_t i = 0; i < LANGUAGE_PLUGIN_COUNT; i++) {
-        for (size_t j = 0; j < pattern_cache.module_patterns[i].pattern_count; j++) {
-            regfree(&pattern_cache.module_patterns[i].compiled_patterns[j]);
+    free(dep->structures);
+    
+    // Free methods
+    for (int i = 0; i < dep->method_count; i++) {
+        free(dep->methods[i].name);
+        free(dep->methods[i].return_type);
+        for (int j = 0; j < dep->methods[i].param_count; j++) {
+            free(dep->methods[i].parameters[j].name);
+            free(dep->methods[i].parameters[j].type);
+            free(dep->methods[i].parameters[j].default_value);
         }
-        free(pattern_cache.module_patterns[i].compiled_patterns);
-
-        for (size_t j = 0; j < pattern_cache.struct_patterns[i].pattern_count; j++) {
-            regfree(&pattern_cache.struct_patterns[i].compiled_patterns[j]);
-        }
-        free(pattern_cache.struct_patterns[i].compiled_patterns);
-
-        for (size_t j = 0; j < pattern_cache.method_patterns[i].pattern_count; j++) {
-            regfree(&pattern_cache.method_patterns[i].compiled_patterns[j]);
-        }
-        free(pattern_cache.method_patterns[i].compiled_patterns);
+        free(dep->methods[i].parameters);
     }
-
-    pattern_cache.initialized = 0;
-}
-
-// Get compiled patterns for a specific language and layer
-static inline const CompiledPatterns* get_compiled_patterns(LanguageType type, AnalysisLayer layer) {
-    const LanguagePlugin* plugin = get_language_plugin(type);
-    if (!plugin || !pattern_cache.initialized) return NULL;
-
-    size_t index = plugin - LANGUAGE_PLUGINS;
-    switch (layer) {
-        case LAYER_MODULE:
-            return &pattern_cache.module_patterns[index];
-        case LAYER_STRUCT:
-            return &pattern_cache.struct_patterns[index];
-        case LAYER_METHOD:
-            return &pattern_cache.method_patterns[index];
-        default:
-            return NULL;
-    }
+    free(dep->methods);
+    
+    free(dep);
 }

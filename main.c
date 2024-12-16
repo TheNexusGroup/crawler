@@ -1,126 +1,163 @@
-# Dependency Crawler
+#include "src/crawler.h"
+#include "src/syntaxes.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <getopt.h>
 
-## Overview
+// Default configuration values
+#define DEFAULT_DEPTH -1
+#define DEFAULT_OUTPUT_FORMAT "terminal"
 
-Crawler is a versatile, multi-language static analysis tool designed to map and visualize dependencies across different programming languages and project structures. It provides comprehensive insights into code relationships at various levels of granularity.
+// Command line options structure
+typedef struct {
+    char** directories;
+    int dir_count;
+    char** library_dirs;
+    int lib_count;
+    int depth;
+    char* output_format;
+    int verbose;
+} CrawlerOptions;
 
-## Features
+// Function to print usage information
+static void print_usage(const char* program_name) {
+    printf("Usage: %s [OPTIONS] [ENTRY_POINT]\n\n", program_name);
+    printf("Options:\n");
+    printf("  -l, --library DIR     Specify additional library directory to search for dependencies\n");
+    printf("  -d, --depth NUM       Set maximum crawl depth (default: unlimited)\n");
+    printf("  -o, --output FORMAT   Output format (terminal, json, graphviz)\n");
+    printf("  -v, --verbose         Enable verbose output\n");
+    printf("  --help                Show this help message\n");
+}
 
-- Support for multiple programming languages:
-  - Rust (.rs)
-  - C/C++ (.c, .cpp, .h) (todo)
-  - JavaScript (.js) (todo)
-  - Go (.go) (todo)
-  - Python (.py) (todo)
+// Function to parse command line arguments
+static CrawlerOptions parse_arguments(int argc, char* argv[]) {
+    CrawlerOptions options = {
+        .directories = malloc(sizeof(char*)),
+        .dir_count = 0,
+        .library_dirs = malloc(sizeof(char*)),
+        .lib_count = 0,
+        .depth = DEFAULT_DEPTH,
+        .output_format = strdup(DEFAULT_OUTPUT_FORMAT),
+        .verbose = 0
+    };
 
-- Dependency Mapping Levels:
-  - File and directory dependencies
-  - Module imports
-  - Class relationships
-  - Function dependencies
-  - Parameter-level connections
+    static struct option long_options[] = {
+        {"library", required_argument, 0, 'l'},
+        {"depth", required_argument, 0, 'd'},
+        {"output", required_argument, 0, 'o'},
+        {"verbose", no_argument, 0, 'v'},
+        {"help", no_argument, 0, 'h'},
+        {0, 0, 0, 0}
+    };
 
-- Flexible Crawling Options:
-  - Crawl current working directory by default
-  - Specify custom entry point directory
-  - Analyze library/dependency directories
-  - Configurable depth and scope of analysis
+    int opt;
+    while ((opt = getopt_long(argc, argv, "l:d:o:vh", long_options, NULL)) != -1) {
+        switch (opt) {
+            case 'l':
+                options.library_dirs = realloc(options.library_dirs, 
+                                            (options.lib_count + 1) * sizeof(char*));
+                options.library_dirs[options.lib_count++] = strdup(optarg);
+                break;
 
-## Installation
+            case 'd':
+                options.depth = atoi(optarg);
+                break;
 
-```bash
-git clone https://github.com/vaziolabs/crawler.git
-cd crawler
-make
-```
+            case 'o':
+                free(options.output_format);
+                options.output_format = strdup(optarg);
+                break;
 
-## Usage
+            case 'v':
+                options.verbose = 1;
+                break;
 
-### Basic Usage
+            case 'h':
+                print_usage(argv[0]);
+                exit(0);
 
-```bash
-# Crawl current directory
-./crawler
+            default:
+                print_usage(argv[0]);
+                exit(1);
+        }
+    }
 
-# Crawl specific directory
-./crawler /path/to/project
+    // Handle non-option arguments (entry points)
+    for (int i = optind; i < argc; i++) {
+        options.directories = realloc(options.directories, 
+                                    (options.dir_count + 1) * sizeof(char*));
+        options.directories[options.dir_count++] = strdup(argv[i]);
+    }
 
-# Crawl with library directory
-./crawler /path/to/project -l /path/to/libraries
-```
+    // If no directory specified, use current directory
+    if (options.dir_count == 0) {
+        options.directories[0] = strdup(".");
+        options.dir_count = 1;
+    }
 
-### Command Line Options
+    return options;
+}
 
-```
-Usage: crawler [OPTIONS] [ENTRY_POINT]
+// Function to free options resources
+static void free_options(CrawlerOptions* options) {
+    for (int i = 0; i < options->dir_count; i++) {
+        free(options->directories[i]);
+    }
+    free(options->directories);
 
-Options:
-  -l, --library DIR     Specify additional library directory to search for dependencies
-  -d, --depth NUM       Set maximum crawl depth (default: unlimited)
-  -o, --output FORMAT   Output format
-  -v, --verbose         Enable verbose output
-  --help                Show this help message
-```
+    for (int i = 0; i < options->lib_count; i++) {
+        free(options->library_dirs[i]);
+    }
+    free(options->library_dirs);
+    
+    free(options->output_format);
+}
 
-### Output Formats
+int main(int argc, char* argv[]) {
+    // Parse command line arguments
+    CrawlerOptions options = parse_arguments(argc, argv);
 
-- `terminal`: Human-readable console output (default)
-- `json`: Structured JSON for further analysis (todo)
-- `graphviz`: Graph visualization format (not implemented)
+    // Create analysis configuration
+    AnalysisConfig config = {
+        .analyze_modules = 1,
+        .analyze_structures = 1,
+        .analyze_methods = 1,
+        .max_depth = options.depth,
+        .follow_external = (options.lib_count > 0)
+    };
 
-## Configuration
+    // Create crawler instance
+    DependencyCrawler* crawler = create_crawler(options.directories, 
+                                              options.dir_count, 
+                                              &config);
+    if (!crawler) {
+        fprintf(stderr, "Failed to create crawler\n");
+        free_options(&options);
+        return 1;
+    }
 
-Create a `.depcrawler.conf` in your project root to customize:
-- Ignored directories
-- Language-specific parsing rules
-- Custom dependency filters
+    // Add library directories if specified
+    for (int i = 0; i < options.lib_count; i++) {
+        // TODO: Implement library directory handling
+        printf("Library directory: %s\n", options.library_dirs[i]);
+    }
 
-Example configuration:
-```toml
-[global]
-ignore_dirs = ["node_modules", "target", "build"]
+    // Perform dependency analysis
+    crawl_dependencies(crawler);
 
-[rust]
-parse_private_modules = true
+    // Export results
+    if (options.verbose) {
+        print_dependencies(crawler, 1);
+    } else {
+        export_dependencies(crawler, options.output_format);
+    }
 
-[python]
-follow_imports = true
-```
+    // Cleanup
+    free_crawler(crawler);
+    free_options(&options);
 
-## Example Scenarios
-
-### 1. Analyzing a Rust Project
-
-```bash
-./crawler ~/projects/my-rust-project
-```
-
-### 2. Deep Analysis with Library Dependencies
-
-```bash
-./crawler ~/projects/complex-app -l ~/projects/shared-libraries -d 3 -o json
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## Limitations
-
-- Static analysis only (no runtime dependency tracking)
-- Parsing complexity varies by language
-- Large projects may require significant memory
-
-## License
-
-Distributed under the Ancillary License. See `LICENSE` for more information.
-
-## Contact
-
-Your Name - dev@vaziolabs.com
-
-Project Link: [https://github.com/vaziolabs/crawler](https://github.com/vaziolabs/crawler)
+    return 0;
+}

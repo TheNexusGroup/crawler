@@ -2,11 +2,110 @@
 #define ANALYZERS_H
 
 #include "syntax_map.h"
+#include "grammars.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define MAX_LINE_LENGTH 1024
 #define MAX_MATCHES 10
+
+// Process module-level matches
+void process_module_matches(ExtractedDependency* dep, char** matches, size_t match_count) {
+    if (!dep || !matches) return;
+
+    // Allocate space for new dependencies if needed
+    if (!dep->module_name) {
+        dep->module_name = strdup(matches[0]);
+    }
+
+    // Process each match as a module dependency
+    for (size_t i = 0; i < match_count; i++) {
+        // TODO: Add module dependencies to the dependency structure
+        // For now, just store the module name
+        if (i == 0 && !dep->module_name) {
+            dep->module_name = strdup(matches[i]);
+        }
+    }
+}
+
+// Process structure-level matches
+void process_struct_matches(ExtractedDependency* dep, char** matches, size_t match_count) {
+    if (!dep || !matches) return;
+
+    // Allocate space for new structures if needed
+    size_t new_count = dep->structure_count + 1;
+    dep->structures = realloc(dep->structures, sizeof(Structure) * new_count);
+    Structure* structure = &dep->structures[dep->structure_count];
+    memset(structure, 0, sizeof(Structure));
+
+    // Process the structure name and any dependencies
+    if (match_count > 0) {
+        structure->name = strdup(matches[0]);
+        
+        // Process additional matches as dependencies or traits
+        for (size_t i = 1; i < match_count; i++) {
+            // Add implemented traits
+            if (structure->trait_count < MAX_TRAITS) {
+                structure->implemented_traits = realloc(structure->implemented_traits, 
+                                                     sizeof(char*) * (structure->trait_count + 1));
+                structure->implemented_traits[structure->trait_count++] = strdup(matches[i]);
+            }
+        }
+    }
+
+    dep->structure_count = new_count;
+}
+
+// Process method-level matches
+void process_method_matches(ExtractedDependency* dep, char** matches, size_t match_count) {
+    if (!dep || !matches || match_count == 0) return;
+
+    // Allocate space for new methods if needed
+    size_t new_count = dep->method_count + 1;
+    dep->methods = realloc(dep->methods, sizeof(Method) * new_count);
+    Method* method = &dep->methods[dep->method_count];
+    memset(method, 0, sizeof(Method));
+
+    // Initialize parameters array
+    method->param_count = 0;
+
+    // Process method name and return type
+    if (match_count > 0) {
+        method->name = strdup(matches[0]);
+        if (match_count > 1) {
+            method->return_type = strdup(matches[1]);
+        }
+
+        // Process parameters if present
+        for (size_t i = 2; i < match_count && method->param_count < MAX_PARAMETERS; i++) {
+            Parameter* param = &method->parameters[method->param_count++];
+            memset(param, 0, sizeof(Parameter));
+
+            // Parse parameter string (format: "name:type=default")
+            char* param_str = strdup(matches[i]);
+            char* type_sep = strchr(param_str, ':');
+            char* default_sep = strchr(param_str, '=');
+
+            if (type_sep) {
+                *type_sep = '\0';
+                param->name = strdup(param_str);
+                if (default_sep) {
+                    *default_sep = '\0';
+                    param->type = strdup(type_sep + 1);
+                    param->default_value = strdup(default_sep + 1);
+                } else {
+                    param->type = strdup(type_sep + 1);
+                }
+            } else {
+                param->name = strdup(param_str);
+            }
+            free(param_str);
+        }
+    }
+
+    dep->method_count = new_count;
+}
 
 // Helper function to extract matches from regex
 static char** extract_matches(const regex_t* pattern, const char* content, 
@@ -32,15 +131,15 @@ static char** extract_matches(const regex_t* pattern, const char* content,
     return results;
 }
 
-// Unified analyzer function
+// Main analyzer function
 ExtractedDependency* analyze_dependencies(const char* content, 
                                         LanguageType lang,
                                         AnalysisLayer layer) {
     ExtractedDependency* dep = malloc(sizeof(ExtractedDependency));
     memset(dep, 0, sizeof(ExtractedDependency));
     
-    const LanguageGrammar* grammar = get_language_grammar(lang);
-    const CompiledPatterns* patterns = get_compiled_patterns(lang, layer);
+    const LanguageGrammar* grammar = languageGrammars(lang);
+    const CompiledPatterns* patterns = compiledPatterns(lang, layer);
     
     if (!patterns || !grammar) return dep;
     

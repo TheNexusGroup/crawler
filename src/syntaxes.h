@@ -3,19 +3,38 @@
 
 #include <regex.h>
 
-// Common patterns across languages
+// Common constants
 #define MAX_PATTERN_LENGTH 256
 #define MAX_MATCHES 10
+#define MAX_LANGUAGES 10
+#define MAX_TRAITS 32
+#define MAX_PARAMETERS 16
+#define MAX_DEPENDENCIES 64
+
+// Structure size limits
+#define MAX_METHODS_PER_STRUCT 32
+#define MAX_PARAMS_PER_METHOD 16
+#define MAX_TRAITS_PER_STRUCT 8
 
 // Enum to represent different supported languages
 typedef enum {
     LANG_RUST,
     LANG_C,
-    LANG_CPP,
     LANG_JAVASCRIPT,
     LANG_GO,
-    LANG_PYTHON
+    LANG_PYTHON,
+    LANG_JAVA,
+    LANG_PHP,
+    LANG_RUBY,
+    LANG_SVELTE,
 } LanguageType;
+
+// Layer definitions for granular analysis
+typedef enum {
+    LAYER_MODULE,    // First layer: modules, files, packages
+    LAYER_STRUCT,    // Second layer: classes, structs, traits
+    LAYER_METHOD     // Third layer: methods, functions, parameters
+} AnalysisLayer;
 
 // Update DependencyLevel to match AnalysisLayer
 typedef enum {
@@ -23,6 +42,32 @@ typedef enum {
     DEP_STRUCT = LAYER_STRUCT,
     DEP_METHOD = LAYER_METHOD
 } DependencyLevel;
+
+// Parameter structure
+typedef struct {
+    char* name;
+    char* type;
+    char* default_value;
+} Parameter;
+
+// Method structure
+typedef struct {
+    char* name;
+    char* return_type;
+    Parameter parameters[MAX_PARAMETERS];
+    int param_count;
+} Method;
+
+// Structure definition
+typedef struct {
+    char* name;
+    Method* methods;
+    int method_count;
+    char** implemented_traits;
+    int trait_count;
+    char** dependencies;
+    int dependency_count;
+} Structure;
 
 // Flexible dependency struct to capture relationships
 typedef struct Dependency {
@@ -33,12 +78,7 @@ typedef struct Dependency {
     struct Dependency* next;
 } Dependency;
 
-// Layer definitions for granular analysis
-typedef enum {
-    LAYER_MODULE,    // First layer: modules, files, packages
-    LAYER_STRUCT,    // Second layer: classes, structs, traits
-    LAYER_METHOD     // Third layer: methods, functions, parameters
-} AnalysisLayer;
+
 
 // Language-specific syntax patterns for each layer
 typedef struct {
@@ -47,73 +87,6 @@ typedef struct {
     regex_t* compiled_patterns;
     AnalysisLayer layer;
 } SyntaxPatterns;
-
-// First Layer: Module-level patterns (existing patterns)
-static const char* RUST_MODULE_PATTERNS[] = {
-    "^\\s*use\\s+([a-zA-Z0-9_:]+)",
-    "^\\s*extern\\s+crate\\s+([a-zA-Z0-9_]+)",
-    "^\\s*mod\\s+([a-zA-Z0-9_]+)",
-    "^\\s*include!\\s*\\(\\s*\"([^\"]+)\"\\s*\\)",
-};
-
-// Second Layer: Struct/Class-level patterns
-static const char* RUST_STRUCT_PATTERNS[] = {
-    "^\\s*(?:pub\\s+)?struct\\s+([a-zA-Z0-9_]+)",     // Struct definitions
-    "^\\s*(?:pub\\s+)?trait\\s+([a-zA-Z0-9_]+)",      // Trait definitions
-    "^\\s*(?:pub\\s+)?enum\\s+([a-zA-Z0-9_]+)",       // Enum definitions
-    "^\\s*impl(?:\\s+[a-zA-Z0-9_]+)?\\s+for\\s+([a-zA-Z0-9_]+)", // Implementations
-};
-
-// Third Layer: Method/Parameter patterns
-static const char* RUST_METHOD_PATTERNS[] = {
-    "^\\s*(?:pub\\s+)?fn\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\)",  // Function definitions with params
-    "^\\s*self\\.([a-zA-Z0-9_]+)\\s*\\(.*\\)",                   // Method calls
-    "^\\s*([a-zA-Z0-9_]+)::([a-zA-Z0-9_]+)\\s*\\(.*\\)",        // Static method calls
-};
-
-// C/C++ patterns for each layer
-static const char* C_MODULE_PATTERNS[] = {
-    "^\\s*#include\\s*[<\"]([^>\"]+)[>\"]",
-    "^\\s*#import\\s*[<\"]([^>\"]+)[>\"]",
-    "^\\s*#pragma\\s+once",
-};
-
-static const char* C_STRUCT_PATTERNS[] = {
-    "^\\s*(?:typedef\\s+)?struct\\s+([a-zA-Z0-9_]+)",  // Struct definitions
-    "^\\s*(?:typedef\\s+)?enum\\s+([a-zA-Z0-9_]+)",    // Enum definitions
-    "^\\s*(?:typedef\\s+)?union\\s+([a-zA-Z0-9_]+)",   // Union definitions
-    "^\\s*class\\s+([a-zA-Z0-9_]+)",                   // C++ class definitions
-};
-
-static const char* C_METHOD_PATTERNS[] = {
-    "^\\s*([a-zA-Z0-9_]+)\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\)", // Function definitions
-    "^\\s*([a-zA-Z0-9_]+)::[a-zA-Z0-9_]+\\s*\\(.*\\)",          // C++ method calls
-};
-
-// Extended structures for deeper analysis
-typedef struct {
-    char* name;
-    char* type;
-    char* default_value;
-} Parameter;
-
-typedef struct {
-    char* name;
-    Parameter* parameters;
-    int param_count;
-    char* return_type;
-    int is_public;
-} Method;
-
-typedef struct {
-    char* name;
-    Method* methods;
-    int method_count;
-    char** implemented_traits;
-    int trait_count;
-    char** dependencies;
-    int dependency_count;
-} Structure;
 
 // Enhanced dependency features
 typedef struct {
