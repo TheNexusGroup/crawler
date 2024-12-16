@@ -6,13 +6,14 @@
 #include <stdio.h>
 
 typedef enum {
+    VERBOSE,
     DEBUG,
     INFO,
     WARN,
     ERROR
 } LogLevel;
 
-static LogLevel current_log_level = INFO;  // Default log level
+static LogLevel current_log_level = DEBUG;  // Default log level
 
 static void logr(LogLevel level, const char* format, ...) {
     if (level < current_log_level) return;
@@ -25,11 +26,12 @@ static void logr(LogLevel level, const char* format, ...) {
     
     const char* level_str;
     switch (level) {
-        case DEBUG: level_str = "DEBUG"; break;
-        case INFO:  level_str = "INFO"; break;
-        case WARN:  level_str = "WARN"; break;
-        case ERROR: level_str = "ERROR"; break;
-        default:        level_str = "UNKNOWN";
+        case VERBOSE: level_str = "VERBOSE"; break;
+        case DEBUG:   level_str = "DEBUG"; break;
+        case INFO:    level_str = "INFO"; break;
+        case WARN:    level_str = "WARN"; break;
+        case ERROR:   level_str = "ERROR"; break;
+        default:      level_str = "UNKNOWN";
     }
     
     fprintf(stderr, "[%s] %s: ", timestamp, level_str);
