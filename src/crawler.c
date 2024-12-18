@@ -330,40 +330,81 @@ void crawl_dependencies(DependencyCrawler* crawler) {
 
 // In print_dependencies function
 static void print_method_tree(Method* method, const char* source_file) {
-    if (!method || !source_file) return;
-    
     while (method) {
-        if (method->name) {
-            logr(INFO, "  ├── %s", method->name);
-            
-            // Print calls
-            if (method->dependencies) {
-                logr(INFO, "  │   ├── calls:");
-                char* deps = strdup(method->dependencies);
-                char* saveptr;
-                char* token = strtok_r(deps, ",", &saveptr);
-                while (token) {
-                    while (*token && isspace(*token)) token++;
-                    if (*token) {
-                        logr(INFO, "  │   │   ├── %s", token);
-                    }
-                    token = strtok_r(NULL, ",", &saveptr);
-                }
-                free(deps);
-            }
-
-            // Print called from
-            MethodReference* ref = method->references;
-            if (ref) {
-                logr(INFO, "  │   ├── called by:");
-                while (ref) {
-                    if (ref->called_in && strcmp(ref->called_in, source_file) != 0) {
-                        logr(INFO, "  │   │   ├── %s", ref->called_in);
-                    }
-                    ref = ref->next;
-                }
+        bool is_last_method = (method->next == NULL);
+        const char* method_prefix = is_last_method ? "└──" : "├──";
+        
+        // Format parameters string
+        char param_str[256] = "";
+        if (method->parameters) {
+            int offset = 0;
+            for (int i = 0; i < method->param_count; i++) {
+                int written = snprintf(param_str + offset, sizeof(param_str) - offset, 
+                    "%s%s %s%s", 
+                    i > 0 ? ", " : "",
+                    method->parameters[i].type ? method->parameters[i].type : "void",
+                    method->parameters[i].name ? method->parameters[i].name : "",
+                    method->parameters[i].default_value ? 
+                        method->parameters[i].default_value : "");
+                if (written < 0) break;
+                offset += written;
             }
         }
+
+        // Print method definition with all available information
+        logr(INFO, "  %s %s(%s) -> %s", 
+            method_prefix,
+            method->name ? method->name : "(unknown)",
+            param_str,
+            method->return_type ? method->return_type : "void");
+        
+        // Print methods this method calls
+        if (method->dependencies) {
+            const char* dep_header_prefix = is_last_method ? "    " : "│   ";
+            logr(INFO, "  %s├── calls:", dep_header_prefix);
+            
+            char* dep_copy = strdup(method->dependencies);
+            char* dep = strtok(dep_copy, ",");
+            char* next_dep = NULL;
+            
+            while (dep) {
+                while (*dep == ' ') dep++; // Skip leading spaces
+                next_dep = strtok(NULL, ",");
+                const char* dep_prefix = next_dep ? "├──" : "└──";
+                logr(INFO, "  %s│   %s %s", dep_header_prefix, dep_prefix, dep);
+                dep = next_dep;
+            }
+            free(dep_copy);
+        }
+
+        // Print methods that call this method
+        MethodReference* ref = method->references;
+        if (ref) {
+            const char* ref_header_prefix = is_last_method ? "    " : "│   ";
+            logr(INFO, "  %s├── called by:", ref_header_prefix);
+            
+            // Count valid references first
+            int valid_refs = 0;
+            MethodReference* count_ref = ref;
+            while (count_ref) {
+                if (count_ref->called_in && strcmp(count_ref->called_in, source_file) != 0) {
+                    valid_refs++;
+                }
+                count_ref = count_ref->next;
+            }
+            
+            // Print references with correct prefixes
+            int current_ref = 0;
+            while (ref) {
+                if (ref->called_in && strcmp(ref->called_in, source_file) != 0) {
+                    current_ref++;
+                    const char* ref_prefix = (current_ref == valid_refs) ? "└──" : "├──";
+                    logr(INFO, "  %s│   %s %s", ref_header_prefix, ref_prefix, ref->called_in);
+                }
+                ref = ref->next;
+            }
+        }
+
         method = method->next;
     }
 }

@@ -8,9 +8,7 @@
 #include <ctype.h>
 
 // Helper function declarations
-static const char* find_matching_brace(const char* start);
 static void add_method_reference(MethodDefinition* def, const char* file_path);
-static void analyze_method_calls(const char* body, MethodDefinition* def);
 
 #define MAX_STRUCTURE_DEFS 1024
 StructureDefinition* structure_definitions = NULL;
@@ -217,7 +215,20 @@ static Method* extract_method_from_match(const char* content, regmatch_t* matche
     if (!method) return NULL;
     memset(method, 0, sizeof(Method));
 
-    // Extract method name using grammar's method_name_group
+    // Extract return type (group 1)
+    if (matches[1].rm_so != -1) {
+        size_t type_len = matches[1].rm_eo - matches[1].rm_so;
+        method->return_type = malloc(type_len + 1);
+        if (method->return_type) {
+            strncpy(method->return_type, content + matches[1].rm_so, type_len);
+            method->return_type[type_len] = '\0';
+            // Clean up whitespace
+            char* end = method->return_type + strlen(method->return_type) - 1;
+            while (end > method->return_type && isspace(*end)) *end-- = '\0';
+        }
+    }
+
+    // Extract method name (group 2 by default in all grammars)
     size_t name_len = matches[grammar->method_name_group].rm_eo - matches[grammar->method_name_group].rm_so;
     method->name = malloc(name_len + 1);
     if (method->name) {
@@ -225,7 +236,7 @@ static Method* extract_method_from_match(const char* content, regmatch_t* matche
         method->name[name_len] = '\0';
     }
 
-    // Extract parameters if they exist (usually in group 2 or 3)
+    // Extract parameters (group after method name)
     int param_group = grammar->method_name_group + 1;
     if (matches[param_group].rm_so != -1) {
         size_t param_len = matches[param_group].rm_eo - matches[param_group].rm_so;
@@ -238,7 +249,6 @@ static Method* extract_method_from_match(const char* content, regmatch_t* matche
         }
     }
 
-    method->next = NULL;
     return method;
 }
 
@@ -446,25 +456,55 @@ ExtractedDependency* analyze_module(const char* content, const LanguageGrammar* 
     return head;
 }
 
+static bool is_method_definition(const char* method_start, size_t len) {
+    // Look for opening brace after the method declaration
+    const char* pos = method_start;
+    const char* end = method_start + len;
+    
+    // Skip past the closing parenthesis
+    while (pos < end && *pos != ')') pos++;
+    if (pos >= end) return false;
+    
+    // Look for opening brace, skipping whitespace
+    pos++;  // Move past ')'
+    while (pos < end && isspace(*pos)) pos++;
+    
+    // Should find an opening brace
+    return (pos < end && *pos == '{');
+}
 
+static void add_method_definition(const char* method_name, const char* file_path) {
+    if (method_def_count >= MAX_METHOD_DEFS || !method_name || !file_path) return;
+    
+    // Skip empty method names
+    if (strlen(method_name) == 0) return;
+    
+    MethodDefinition* def = &method_definitions[method_def_count];
+    def->name = strdup(method_name);
+    def->defined_in = strdup(file_path);
+    def->dependencies = NULL;
+    def->references = NULL;
+    def->reference_count = 0;
+    
+    logr(DEBUG, "[Analyzer] Added method definition: %s in %s", 
+         def->name, file_path);
+    
+    method_def_count++;
+}
+
+static bool found_existing_definition(const char* method_name) {
+    for (size_t i = 0; i < method_def_count; i++) {
+        if (strcmp(method_definitions[i].name, method_name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
 
 void collect_method_definitions(const char* file_path, const char* content, const LanguageGrammar* grammar) {
-    logr(DEBUG, "[Analyzer] Starting method definition collection for file: %s", file_path);
-    
     if (!method_definitions) {
         method_definitions = calloc(MAX_METHOD_DEFS, sizeof(MethodDefinition));
-        if (!method_definitions) {
-            logr(ERROR, "[Analyzer] Failed to allocate method definitions array");
-            return;
-        }
-        // Initialize all fields to NULL/0
-        for (size_t i = 0; i < MAX_METHOD_DEFS; i++) {
-            method_definitions[i].name = NULL;
-            method_definitions[i].defined_in = NULL;
-            method_definitions[i].dependencies = NULL;
-            method_definitions[i].references = NULL;
-            method_definitions[i].reference_count = 0;
-        }
+        if (!method_definitions) return;
     }
 
     const CompiledPatterns* patterns = compiledPatterns(grammar->type, LAYER_METHOD);
@@ -473,47 +513,26 @@ void collect_method_definitions(const char* file_path, const char* content, cons
     for (size_t i = 0; i < patterns->pattern_count; i++) {
         regex_t* regex = &patterns->compiled_patterns[i];
         const char* pos = content;
-        regmatch_t matches[4];
+        regmatch_t matches[4];  // We need up to 4 groups
 
         while (regexec(regex, pos, 4, matches, 0) == 0) {
-            // Only process if we have a valid method name group match
-            if (matches[grammar->method_name_group].rm_so != -1) {
+            if (is_method_definition(pos + matches[0].rm_so, 
+                                   matches[0].rm_eo - matches[0].rm_so)) {
+                
+                // Extract method name using the language-specific group
                 size_t name_len = matches[grammar->method_name_group].rm_eo - 
                                 matches[grammar->method_name_group].rm_so;
                 
                 char* method_name = malloc(name_len + 1);
-                strncpy(method_name, pos + matches[grammar->method_name_group].rm_so, name_len);
+                if (!method_name) continue;
+                
+                strncpy(method_name, 
+                        pos + matches[grammar->method_name_group].rm_so, 
+                        name_len);
                 method_name[name_len] = '\0';
 
-                // Skip if it's empty or just whitespace
-                bool is_valid = false;
-                for (size_t j = 0; j < name_len; j++) {
-                    if (!isspace(method_name[j])) {
-                        is_valid = true;
-                        break;
-                    }
-                }
-
-                if (is_valid) {
-                    // Add to definitions if not already present
-                    bool found = false;
-                    for (size_t j = 0; j < method_def_count; j++) {
-                        if (method_definitions[j].name && 
-                            strcmp(method_definitions[j].name, method_name) == 0) {
-                            found = true;
-                            break;
-                        }
-                    }
-
-                    if (!found && method_def_count < MAX_METHOD_DEFS) {
-                        method_definitions[method_def_count].name = strdup(method_name);
-                        method_definitions[method_def_count].defined_in = strdup(file_path);
-                        method_definitions[method_def_count].references = NULL;
-                        method_definitions[method_def_count].reference_count = 0;
-                        logr(DEBUG, "[Analyzer] Found method definition: %s in %s", 
-                             method_name, file_path);
-                        method_def_count++;
-                    }
+                if (!found_existing_definition(method_name)) {
+                    add_method_definition(method_name, file_path);
                 }
                 free(method_name);
             }
@@ -546,34 +565,19 @@ void free_method_definitions() {
 
 // Add these implementations before collect_method_definitions
 
-static const char* find_matching_brace(const char* start) {
-    if (!start || *start != '{') return NULL;
-    
-    int brace_count = 1;
-    const char* pos = start + 1;
-    
-    while (*pos && brace_count > 0) {
-        if (*pos == '{') brace_count++;
-        else if (*pos == '}') brace_count--;
-        pos++;
-    }
-    
-    return (brace_count == 0) ? pos - 1 : NULL;
-}
-
 static void add_method_reference(MethodDefinition* def, const char* file_path) {
     if (!def || !file_path) return;
 
-    // Check if reference already exists
-    MethodReference* current = def->references;
-    while (current) {
-        if (strcmp(current->called_in, file_path) == 0) {
-            return; // Reference already exists
+    // Check if we already have this reference
+    MethodReference* curr = def->references;
+    while (curr) {
+        if (strcmp(curr->called_in, file_path) == 0) {
+            return; // Already recorded
         }
-        current = current->next;
+        curr = curr->next;
     }
 
-    // Create new reference
+    // Add new reference
     MethodReference* new_ref = malloc(sizeof(MethodReference));
     if (!new_ref) return;
 
@@ -581,46 +585,8 @@ static void add_method_reference(MethodDefinition* def, const char* file_path) {
     new_ref->next = def->references;
     def->references = new_ref;
     def->reference_count++;
+    
+    logr(DEBUG, "[Analyzer] Added reference to method %s from %s", 
+         def->name, file_path);
 }
 
-static void analyze_method_calls(const char* body, MethodDefinition* def) {
-    if (!body || !def) return;
-
-    // For each method definition we know about
-    for (size_t i = 0; i < method_def_count; i++) {
-        if (!method_definitions[i].name) continue;
-
-        // Skip self-references
-        if (strcmp(method_definitions[i].name, def->name) == 0) continue;
-
-        // Create pattern to look for method name with word boundaries
-        char pattern[256];
-        snprintf(pattern, sizeof(pattern), "\\b%s\\s*\\(", method_definitions[i].name);
-        
-        regex_t regex;
-        if (regcomp(&regex, pattern, REG_EXTENDED) == 0) {
-            if (regexec(&regex, body, 0, NULL, 0) == 0) {
-                // Found a call to this method
-                add_method_reference(&method_definitions[i], def->defined_in);
-
-                // Add to dependencies list
-                if (!def->dependencies) {
-                    def->dependencies = strdup(method_definitions[i].name);
-                } else {
-                    // Check if dependency already exists
-                    char* found = strstr(def->dependencies, method_definitions[i].name);
-                    if (!found || (found > def->dependencies && found[-1] != ' ') || 
-                        (found[strlen(method_definitions[i].name)] != '\0' && 
-                         found[strlen(method_definitions[i].name)] != ',')) {
-                        char* new_deps = malloc(strlen(def->dependencies) + 
-                                              strlen(method_definitions[i].name) + 3);
-                        sprintf(new_deps, "%s, %s", def->dependencies, method_definitions[i].name);
-                        free(def->dependencies);
-                        def->dependencies = new_deps;
-                    }
-                }
-            }
-            regfree(&regex);
-        }
-    }
-}
