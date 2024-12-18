@@ -49,7 +49,7 @@ DependencyCrawler* create_crawler(char** directories, int directory_count, Analy
         // Default configuration
         crawler->analysis_config.analyze_modules = 1;
         crawler->analysis_config.analyze_structures = 1;
-        crawler->analysis_config.analyze_methods = 1;
+        crawler->analysis_config.analyzeMethods = 1;
         crawler->analysis_config.max_depth = -1;
         crawler->analysis_config.follow_external = 0;
     }
@@ -89,7 +89,7 @@ void registerParser(DependencyCrawler* crawler, LanguageType type,
     crawler->parsers[crawler->parser_count - 1].type = type;
     crawler->parsers[crawler->parser_count - 1].analyze_module = parser->analyze_module;
     crawler->parsers[crawler->parser_count - 1].analyze_structure = parser->analyze_structure;
-    crawler->parsers[crawler->parser_count - 1].analyze_method = parser->analyze_method;
+    crawler->parsers[crawler->parser_count - 1].analyzeMethod = parser->analyzeMethod;
 }
 
 // Process file content based on analysis layer
@@ -212,9 +212,9 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
     }
 
     // Analyze methods
-    if (crawler->analysis_config.analyze_methods) {
+    if (crawler->analysis_config.analyzeMethods) {
         logr(DEBUG, "[Crawler] Analyzing methods for file: %s", filepath);
-        Method* methods = analyze_method(filepath, content, grammar);
+        Method* methods = analyzeMethod(filepath, content, grammar);
         
         if (methods) {
             graphMethods(crawler, filepath, methods);
@@ -479,7 +479,7 @@ void printDependencies(DependencyCrawler* crawler) {
         logr(INFO, "Total Structure Dependencies: %zu\n", struct_count);
     }
 
-    if (crawler->analysis_config.analyze_methods) {
+    if (crawler->analysis_config.analyzeMethods) {
         logr(INFO, "Method Dependencies:");
         logr(INFO, "-----------------");
         

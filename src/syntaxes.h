@@ -139,7 +139,7 @@ typedef struct {
 typedef struct {
     int analyze_modules;      // First layer
     int analyze_structures;   // Second layer
-    int analyze_methods;      // Third layer
+    int analyzeMethods;      // Third layer
     int max_depth;           // Maximum recursion depth
     int follow_external;     // Whether to analyze external dependencies
 } AnalysisConfig;
@@ -151,7 +151,7 @@ ExtractedDependency* analyze_file(const char* file_path, AnalysisConfig* config)
 typedef struct {
     ExtractedDependency* (*analyze_module)(const char* content);
     Structure* (*analyze_structure)(const char* content);
-    Method* (*analyze_method)(const char* content);
+    Method* (*analyzeMethod)(const char* content);
 } LanguageAnalyzer;
 
 // Helper functions for relationship mapping
@@ -189,6 +189,8 @@ typedef struct MethodDefinition {
     char* dependencies;
     MethodReference* references;
     int reference_count;
+    char* return_type;
+    Parameter* parameters;
 } MethodDefinition;
 
 

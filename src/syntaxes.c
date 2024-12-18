@@ -82,7 +82,7 @@ ExtractedDependency* analyze_file(const char* file_path, AnalysisConfig* config)
     if (grammar) {
         // Update this line to include file_path
         dep->structures = analyze_structure(content, file_path, grammar);
-        dep->methods = analyze_method(file_path, content, grammar);
+        dep->methods = analyzeMethod(file_path, content, grammar);
         dep->modules = analyze_module(content, grammar);
     }
 

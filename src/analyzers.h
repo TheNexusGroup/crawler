@@ -32,7 +32,7 @@ extern size_t method_def_count;
 // Core analysis functions
 ExtractedDependency* analyze_module(const char* content, const LanguageGrammar* grammar);
 Structure* analyze_structure(const char* content, const char* file_path, const LanguageGrammar* grammar);
-Method* analyze_method(const char* file_path, const char* content, const LanguageGrammar* grammar);
+Method* analyzeMethod(const char* file_path, const char* content, const LanguageGrammar* grammar);
 
 // Structure tracking functions
 void collectStructures(const char* file_path, const char* content, const LanguageGrammar* grammar);
@@ -40,7 +40,6 @@ StructureDefinition* get_structure_definitions(size_t* count);
 
 // Method tracking functions
 void collectDefinitions(const char* file_path, const char* content, const LanguageGrammar* grammar);
-MethodDefinition* get_method_definitions(size_t* count);
 
 // Dependency conversion helpers
 Dependency* create_dependency_from_extracted(ExtractedDependency* extracted);

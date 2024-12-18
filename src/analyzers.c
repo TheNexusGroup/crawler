@@ -207,7 +207,7 @@ static bool withinScope(const char* content, size_t position, ScopeContext* cont
     return brace_count > 0;
 }
 
-// Add this helper function before analyze_method
+// Add this helper function before analyzeMethod
 static Method* extract_method_from_match(const char* content, regmatch_t* matches, const LanguageGrammar* grammar) {
     if (!content || !matches || !grammar) return NULL;
 
@@ -252,8 +252,132 @@ static Method* extract_method_from_match(const char* content, regmatch_t* matche
     return method;
 }
 
-// Update the analyze_method function to separate definitions from calls
-Method* analyze_method(const char* file_path, const char* content, const LanguageGrammar* grammar) {
+// Modify isKeyword to use the grammar's keyword list
+static bool isKeyword(const char* name, const LanguageGrammar* grammar) {
+    if (!name || !grammar || !grammar->keywords) return false;
+    
+    for (size_t i = 0; i < grammar->keyword_count; i++) {
+        if (strcmp(name, grammar->keywords[i]) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Modify addMethod to check for keywords
+static void addMethod(const char* method_name, const char* file_path, const char* return_type, const char* params) {
+    if (method_def_count >= MAX_METHOD_DEFS || !method_name || !file_path) return;
+    
+    // Skip empty method names and keywords
+    if (strlen(method_name) == 0) return;
+    
+    MethodDefinition* def = &method_definitions[method_def_count];
+    def->name = strdup(method_name);
+    def->defined_in = strdup(file_path);
+    def->return_type = return_type ? strdup(return_type) : NULL;
+    def->parameters = params ? parse_parameters(params) : NULL;
+    def->dependencies = NULL;
+    def->references = NULL;
+    def->reference_count = 0;
+    
+    method_def_count++;
+}
+
+static bool methodDefinition(const char* method_start, size_t len) {
+    // Look for opening brace after the method declaration
+    const char* pos = method_start;
+    const char* end = method_start + len;
+    
+    // Skip past the closing parenthesis
+    while (pos < end && *pos != ')') pos++;
+    if (pos >= end) return false;
+    
+    // Look for opening brace, skipping whitespace
+    pos++;  // Move past ')'
+    while (pos < end && isspace(*pos)) pos++;
+    
+    // Should find an opening brace
+    return (pos < end && *pos == '{');
+}
+
+static bool definitionFound(const char* method_name) {
+    for (size_t i = 0; i < method_def_count; i++) {
+        if (strcmp(method_definitions[i].name, method_name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Modify collectDefinitions to use isKeyword with grammar
+void collectDefinitions(const char* file_path, const char* content, const LanguageGrammar* grammar) {
+    if (!method_definitions) {
+        method_definitions = calloc(MAX_METHOD_DEFS, sizeof(MethodDefinition));
+        if (!method_definitions) return;
+    }
+
+    const CompiledPatterns* patterns = compiledPatterns(grammar->type, LAYER_METHOD);
+    if (!patterns) return;
+
+    for (size_t i = 0; i < patterns->pattern_count; i++) {
+        regex_t* regex = &patterns->compiled_patterns[i];
+        const char* pos = content;
+        regmatch_t matches[4];  // We need up to 4 groups
+
+        while (regexec(regex, pos, 4, matches, 0) == 0) {
+            if (methodDefinition(pos + matches[0].rm_so, matches[0].rm_eo - matches[0].rm_so)) {
+                // Extract return type (group 1)
+                char* return_type = NULL;
+                if (matches[1].rm_so != -1) {
+                    size_t type_len = matches[1].rm_eo - matches[1].rm_so;
+                    return_type = malloc(type_len + 1);
+                    if (return_type) {
+                        strncpy(return_type, pos + matches[1].rm_so, type_len);
+                        return_type[type_len] = '\0';
+                    }
+                }
+
+                // Extract method name using the language-specific group
+                size_t name_len = matches[grammar->method_name_group].rm_eo - 
+                                matches[grammar->method_name_group].rm_so;
+                char* method_name = malloc(name_len + 1);
+                if (!method_name) {
+                    free(return_type);
+                    continue;
+                }
+                strncpy(method_name, 
+                        pos + matches[grammar->method_name_group].rm_so, 
+                        name_len);
+                method_name[name_len] = '\0';
+
+                // Extract parameters (group after method name)
+                char* params = NULL;
+                int param_group = grammar->method_name_group + 1;
+                if (matches[param_group].rm_so != -1) {
+                    size_t param_len = matches[param_group].rm_eo - matches[param_group].rm_so;
+                    params = malloc(param_len + 1);
+                    if (params) {
+                        strncpy(params, pos + matches[param_group].rm_so, param_len);
+                        params[param_len] = '\0';
+                    }
+                }
+
+                // Skip if method name is a keyword
+                if (!isKeyword(method_name, grammar) && !definitionFound(method_name)) {
+                    addMethod(method_name, file_path, return_type, params);
+                }
+
+                free(method_name);
+                free(return_type);
+                free(params);
+            }
+            pos += matches[0].rm_eo;
+        }
+    }
+}
+
+// Modify analyzeMethod to properly transfer return types and parameters
+Method* analyzeMethod(const char* file_path, const char* content, const LanguageGrammar* grammar) {
     if (!content || !grammar) {
         logr(ERROR, "[Analyzer] Invalid parameters for method analysis");
         return NULL;
@@ -276,6 +400,8 @@ Method* analyze_method(const char* file_path, const char* content, const Languag
         memset(method, 0, sizeof(Method));
         method->name = strdup(def->name);
         method->defined_in = strdup(def->defined_in);
+        method->return_type = def->return_type ? strdup(def->return_type) : NULL;
+        method->parameters = def->parameters;  // Transfer parameter ownership
         method->is_definition = true;
         
         // Convert references
@@ -454,91 +580,6 @@ ExtractedDependency* analyze_module(const char* content, const LanguageGrammar* 
     }
 
     return head;
-}
-
-static bool methodDefinition(const char* method_start, size_t len) {
-    // Look for opening brace after the method declaration
-    const char* pos = method_start;
-    const char* end = method_start + len;
-    
-    // Skip past the closing parenthesis
-    while (pos < end && *pos != ')') pos++;
-    if (pos >= end) return false;
-    
-    // Look for opening brace, skipping whitespace
-    pos++;  // Move past ')'
-    while (pos < end && isspace(*pos)) pos++;
-    
-    // Should find an opening brace
-    return (pos < end && *pos == '{');
-}
-
-static void addMethod(const char* method_name, const char* file_path) {
-    if (method_def_count >= MAX_METHOD_DEFS || !method_name || !file_path) return;
-    
-    // Skip empty method names
-    if (strlen(method_name) == 0) return;
-    
-    MethodDefinition* def = &method_definitions[method_def_count];
-    def->name = strdup(method_name);
-    def->defined_in = strdup(file_path);
-    def->dependencies = NULL;
-    def->references = NULL;
-    def->reference_count = 0;
-    
-    logr(DEBUG, "[Analyzer] Added method definition: %s in %s", 
-         def->name, file_path);
-    
-    method_def_count++;
-}
-
-static bool definitionFound(const char* method_name) {
-    for (size_t i = 0; i < method_def_count; i++) {
-        if (strcmp(method_definitions[i].name, method_name) == 0) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void collectDefinitions(const char* file_path, const char* content, const LanguageGrammar* grammar) {
-    if (!method_definitions) {
-        method_definitions = calloc(MAX_METHOD_DEFS, sizeof(MethodDefinition));
-        if (!method_definitions) return;
-    }
-
-    const CompiledPatterns* patterns = compiledPatterns(grammar->type, LAYER_METHOD);
-    if (!patterns) return;
-
-    for (size_t i = 0; i < patterns->pattern_count; i++) {
-        regex_t* regex = &patterns->compiled_patterns[i];
-        const char* pos = content;
-        regmatch_t matches[4];  // We need up to 4 groups
-
-        while (regexec(regex, pos, 4, matches, 0) == 0) {
-            if (methodDefinition(pos + matches[0].rm_so, 
-                                   matches[0].rm_eo - matches[0].rm_so)) {
-                
-                // Extract method name using the language-specific group
-                size_t name_len = matches[grammar->method_name_group].rm_eo - 
-                                matches[grammar->method_name_group].rm_so;
-                
-                char* method_name = malloc(name_len + 1);
-                if (!method_name) continue;
-                
-                strncpy(method_name, 
-                        pos + matches[grammar->method_name_group].rm_so, 
-                        name_len);
-                method_name[name_len] = '\0';
-
-                if (!definitionFound(method_name)) {
-                    addMethod(method_name, file_path);
-                }
-                free(method_name);
-            }
-            pos += matches[0].rm_eo;
-        }
-    }
 }
 
 void freeMethod_references(MethodReference* refs) {

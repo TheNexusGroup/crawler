@@ -12,7 +12,7 @@ typedef struct {
     LanguageType type;
     ExtractedDependency* (*analyze_module)(const char* content);
     Structure* (*analyze_structure)(const char* content);
-    Method* (*analyze_method)(const char* content);
+    Method* (*analyzeMethod)(const char* content);
 } LanguageParser;
 
 // Enhanced Crawler configuration

@@ -133,7 +133,7 @@ int main(int argc, char* argv[]) {
     AnalysisConfig config = {
         .analyze_modules = 0,
         .analyze_structures = 0,
-        .analyze_methods = 1,
+        .analyzeMethods = 1,
         .max_depth = options.depth,
         .follow_external = (options.lib_count > 0)
     };
