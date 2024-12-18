@@ -83,11 +83,13 @@ typedef struct Method {
     int param_count;
     char* dependencies;
     char* defined_in;
-    char* called_in;
+    struct MethodReference* references;
+    int reference_count;
     struct Method* next;      // Sibling methods
     struct Method* children;  // Child methods (e.g., class methods)
     bool is_static;
     bool is_public;
+    bool is_definition;
 } Method;
 
 typedef struct Structure {
@@ -171,7 +173,7 @@ typedef struct {
 DependencyGraph* create_dependency_graph(ExtractedDependency** deps, int dep_count);
 void export_graph(DependencyGraph* graph, const char* format, const char* output_path);
 void free_structures(Structure* structs);
-void free_methods(Method* methods);
+extern void free_methods(Method* methods);
 void free_dependency(ExtractedDependency* dep);
 
 

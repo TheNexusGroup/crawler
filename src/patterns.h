@@ -46,14 +46,20 @@ static const char* C_STRUCT_PATTERNS[] = {
 };
 
 static const char* C_METHOD_PATTERNS[] = {
-    // Basic function definition - capture type and name
-    "^\\s*([^;\\s]+)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\)\\s*\\{",
-    
-    // Function declaration - capture type and name
-    "^\\s*([^;\\s]+)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\);",
+    // Function definition with return type and name
+    "([a-zA-Z_][a-zA-Z0-9_]*\\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\)\\s*\\{",
     
     // Function with storage class specifiers
-    "^\\s*(static|extern|inline)\\s+[^;]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\)"
+    "(static|extern|inline)\\s+([a-zA-Z_][a-zA-Z0-9_]*\\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\)\\s*\\{",
+    
+    // Function pointer typedef
+    "typedef\\s+([a-zA-Z_][a-zA-Z0-9_]*\\s+)+\\(\\*([a-zA-Z_][a-zA-Z0-9_]*)\\)\\s*\\([^)]*\\)",
+    
+    // Method calls
+    "([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\)",
+    
+    // Method calls with namespace/scope
+    "([a-zA-Z_][a-zA-Z0-9_]*)::[a-zA-Z_][a-zA-Z0-9_]*\\s*\\([^)]*\\)"
 };
 
 // JavaScript/TypeScript patterns
@@ -188,6 +194,11 @@ static const char* SVELTE_METHOD_PATTERNS[] = {
     "^\\s*export\\s+function\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\)" // Exported functions
 };
 
+static const char* RUST_KEYWORDS[] = {
+    "if", "else", "while", "for", "loop", "match", "break", "continue",
+    "return", "yield", "in", "where", "move", "mut", "ref", "type"
+};
+
 // Language keywords to filter from method detection
 static const char* C_KEYWORDS[] = {
     "if", "else", "while", "for", "do", "switch", "case", "break", "continue", 
@@ -212,11 +223,6 @@ static const char* RUBY_KEYWORDS[] = {
 static const char* GO_KEYWORDS[] = {
     "if", "else", "for", "range", "switch", "case", "break", "continue",
     "return", "goto", "fallthrough", "defer", "select", "type"
-};
-
-static const char* RUST_KEYWORDS[] = {
-    "if", "else", "while", "for", "loop", "match", "break", "continue",
-    "return", "yield", "in", "where", "move", "mut", "ref", "type"
 };
 
 static const char* PHP_KEYWORDS[] = {

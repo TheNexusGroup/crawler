@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include "logger.h"
+#include <ctype.h>
 
 // Add these after includes
 static void process_file(DependencyCrawler* crawler, const char* file_path);
@@ -329,27 +330,67 @@ void crawl_dependencies(DependencyCrawler* crawler) {
 
 // In print_dependencies function
 static void print_method_tree(Method* method, const char* source_file) {
+    if (!method || !source_file) return;
+    
+    // Track printed methods to avoid duplicates
+    char** printed = NULL;
+    size_t printed_count = 0;
+    
     while (method) {
-        // Print method name
-        logr(INFO, "  ├── %s", method->name ? method->name : "<unknown>");
-        
-        // Print definition location if different from source
-        if (method->defined_in && strcmp(method->defined_in, source_file) != 0) {
-            logr(INFO, "  │   └── defined in: %s", method->defined_in);
-        }
-        
-        // Print call location if available
-        if (method->called_in) {
-            logr(INFO, "  │   └── called in: %s", method->called_in);
+        if (!method->name) {
+            method = method->next;
+            continue;
         }
 
-        // Print dependencies if available
-        if (method->dependencies) {
-            logr(INFO, "  │   └── calls: %s", method->dependencies);
+        // Check if we've already printed this method
+        bool already_printed = false;
+        for (size_t i = 0; i < printed_count; i++) {
+            if (strcmp(printed[i], method->name) == 0) {
+                already_printed = true;
+                break;
+            }
         }
 
+        if (!already_printed) {
+            // Add to printed list
+            printed = realloc(printed, (printed_count + 1) * sizeof(char*));
+            printed[printed_count++] = strdup(method->name);
+
+            // Print method name
+            logr(INFO, "  ├── %s", method->name);
+
+            // Print where this method is called from
+            MethodReference* ref = method->references;
+            while (ref) {
+                if (ref->called_in && strcmp(ref->called_in, source_file) != 0) {
+                    logr(INFO, "  │   ├── called from %s", ref->called_in);
+                }
+                ref = ref->next;
+            }
+
+            // Print what this method calls
+            if (method->dependencies) {
+                char* deps = strdup(method->dependencies);
+                char* saveptr;
+                char* token = strtok_r(deps, ",", &saveptr);
+                while (token) {
+                    while (*token && isspace(*token)) token++;
+                    if (*token) {
+                        logr(INFO, "  │   ├── calls %s", token);
+                    }
+                    token = strtok_r(NULL, ",", &saveptr);
+                }
+                free(deps);
+            }
+        }
         method = method->next;
     }
+
+    // Cleanup
+    for (size_t i = 0; i < printed_count; i++) {
+        free(printed[i]);
+    }
+    free(printed);
 }
 
 // Print dependency information
@@ -426,15 +467,49 @@ void print_dependencies(DependencyCrawler* crawler) {
         logr(INFO, "Method Dependencies:");
         logr(INFO, "-----------------");
         
+        // Create a hash table or sorted list to track unique files
+        char** processed_files = NULL;
+        size_t file_count = 0;
+        
+        // First pass - collect unique files
         Dependency* current = crawler->dependency_graph;
         while (current) {
-            if (current->level == LAYER_METHOD && current->methods) {
-                logr(INFO, "\n%s", current->source);
-                print_method_tree(current->methods, current->source);
-                method_count++;
+            if (current->level == LAYER_METHOD && current->source) {
+                bool found = false;
+                for (size_t i = 0; i < file_count; i++) {
+                    if (strcmp(processed_files[i], current->source) == 0) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    processed_files = realloc(processed_files, 
+                                           (file_count + 1) * sizeof(char*));
+                    processed_files[file_count] = strdup(current->source);
+                    file_count++;
+                }
             }
             current = current->next;
         }
+        
+        // Second pass - print method dependencies for each unique file
+        for (size_t i = 0; i < file_count; i++) {
+            logr(INFO, "Method Dependencies for %s:", processed_files[i]);
+            logr(INFO, "-----------------------------");
+            
+            Dependency* current = crawler->dependency_graph;
+            while (current) {
+                if (current->level == LAYER_METHOD && current->source && 
+                    strcmp(current->source, processed_files[i]) == 0) {
+                    print_method_tree(current->methods, current->source);
+                    method_count++;
+                }
+                current = current->next;
+            }
+            logr(INFO, "\nTotal Method Dependencies for %s: %d\n", processed_files[i], method_count);
+            free(processed_files[i]);
+        }
+        free(processed_files);
         logr(INFO, "\nTotal Method Dependencies: %d\n", method_count);
     }
 
@@ -479,11 +554,21 @@ void free_crawler(DependencyCrawler* crawler) {
             Method* method = current->methods;
             while (method) {
                 Method* next_method = method->next;
+                
+                // Free basic method data
                 free(method->name);
                 free(method->return_type);
                 free(method->dependencies);
                 free(method->defined_in);
-                free(method->called_in);
+                
+                // Free method references
+                MethodReference* ref = method->references;
+                while (ref) {
+                    MethodReference* next_ref = ref->next;
+                    free(ref->called_in);
+                    free(ref);
+                    ref = next_ref;
+                }
                 
                 // Free parameters
                 for (int j = 0; j < method->param_count; j++) {
@@ -492,6 +577,10 @@ void free_crawler(DependencyCrawler* crawler) {
                     free(method->parameters[j].default_value);
                 }
                 free(method->parameters);
+                
+                // Free children methods recursively
+                free_methods(method->children);
+                
                 free(method);
                 method = next_method;
             }

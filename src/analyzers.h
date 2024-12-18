@@ -25,15 +25,19 @@ typedef struct ScopeContext {
     int brace_depth;    
 } ScopeContext;
 
+// Add this structure to track method references
+typedef struct MethodReference {
+    char* called_in;
+    struct MethodReference* next;
+} MethodReference;
+
 // Method definition tracking
-typedef struct {
+typedef struct MethodDefinition {
     char* name;
-    char* return_type;
     char* defined_in;
+    MethodReference* references;  // Change from referenced_in array
     int reference_count;
-    char** referenced_in;
-    size_t max_references;
-    char* scope;
+    int max_references;  // Keep this if still needed
 } MethodDefinition;
 
 extern MethodDefinition* method_definitions;
@@ -56,5 +60,9 @@ MethodDefinition* get_method_definitions(size_t* count);
 Dependency* create_dependency_from_extracted(ExtractedDependency* extracted);
 void add_to_dependency_graph(Dependency* graph, ExtractedDependency* extracted);
 void free_extracted_dependency(ExtractedDependency* dep);
+
+// Add these if they're not already present
+void free_method_references(MethodReference* refs);
+void free_method_definitions(void);
 
 #endif // ANALYZERS_H
