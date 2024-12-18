@@ -46,17 +46,17 @@ static const char* C_STRUCT_PATTERNS[] = {
 };
 
 static const char* C_METHOD_PATTERNS[] = {
-    // Function definition with return type and name
+    // Function definition with return type and name - capture parameters
     "([a-zA-Z_][a-zA-Z0-9_]*\\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{",
     
-    // Function with storage class specifiers
-    "(static|extern|inline)\\s+([a-zA-Z_][a-zA-Z0-9_]*\\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*)\\)\\s*\\{",
+    // Function with storage class specifiers - capture parameters
+    "(static|extern|inline)\\s+([a-zA-Z_][a-zA-Z0-9_]*\\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{",
     
-    // Function pointer typedef
-    "typedef\\s+([a-zA-Z_][a-zA-Z0-9_]*\\s+)+\\(\\*([a-zA-Z_][a-zA-Z0-9_]*)\\)\\s*\\([^)]*\\)",
+    // Function pointer typedef - capture parameters
+    "typedef\\s+([a-zA-Z_][a-zA-Z0-9_]*\\s+)+\\(\\*([a-zA-Z_][a-zA-Z0-9_]*)\\)\\s*\\(([^)]*)\\)",
     
-    // Method calls
-    "([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\)",
+    // Method calls - capture parameters
+    "([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)",
     
     // Method calls with namespace/scope
     "([a-zA-Z_][a-zA-Z0-9_]*)::[a-zA-Z_][a-zA-Z0-9_]*\\s*\\([^)]*\\)"

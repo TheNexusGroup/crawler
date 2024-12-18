@@ -135,7 +135,6 @@ Structure* analyze_structure(const char* content, const char* file_path, const L
     return head;
 }
 
-// Add this helper function to parse parameters from a parameter string
 Parameter* parse_parameters(const char* params_str) {
     if (!params_str || !*params_str) return NULL;
 
@@ -147,8 +146,8 @@ Parameter* parse_parameters(const char* params_str) {
         p++;
     }
 
-    // Allocate parameter array
-    Parameter* params = calloc(param_count, sizeof(Parameter));
+    // Allocate parameter array (add 1 for NULL terminator)
+    Parameter* params = calloc(param_count + 1, sizeof(Parameter));
     if (!params) return NULL;
 
     // Parse each parameter
@@ -162,31 +161,36 @@ Parameter* parse_parameters(const char* params_str) {
 
         // Parse parameter parts (type and name)
         char* type_end = token;
-        while (*type_end && !isspace(*type_end)) type_end++;
+        char* name_start = NULL;
         
-        if (*type_end) {
-            // We found a space, split into type and name
-            *type_end = '\0';
-            char* name_start = type_end + 1;
-            while (*name_start && isspace(*name_start)) name_start++;
-
-            // Check for default value
-            char* default_start = strchr(name_start, '=');
-            if (default_start) {
-                *default_start = '\0';
-                default_start++;
-                while (*default_start && isspace(*default_start)) default_start++;
-                params[idx].default_value = strdup(default_start);
-            }
-
+        // Find the last word (name) by looking for the last space
+        char* last_space = strrchr(token, ' ');
+        if (last_space) {
+            *last_space = '\0';
+            name_start = last_space + 1;
+            
+            // Clean up the type string
+            char* end = last_space - 1;
+            while (end > token && isspace(*end)) *end-- = '\0';
+            
             params[idx].type = strdup(token);
             params[idx].name = strdup(name_start);
-            idx++;
+        } else {
+            // Only a type, no name
+            params[idx].type = strdup(token);
+            params[idx].name = strdup("");
         }
 
+        idx++;
         token = strtok(NULL, ",");
     }
 
+    // Ensure the last entry has NULL type as terminator
+    params[idx].type = NULL;
+    params[idx].name = NULL;
+    params[idx].default_value = NULL;
+
+    free(params_copy);
     return params;
 }
 
@@ -207,7 +211,7 @@ static bool withinScope(const char* content, size_t position, ScopeContext* cont
     return brace_count > 0;
 }
 
-// Add this helper function before analyzeMethod
+
 static Method* extract_method_from_match(const char* content, regmatch_t* matches, const LanguageGrammar* grammar) {
     if (!content || !matches || !grammar) return NULL;
 
@@ -244,7 +248,23 @@ static Method* extract_method_from_match(const char* content, regmatch_t* matche
         if (param_str) {
             strncpy(param_str, content + matches[param_group].rm_so, param_len);
             param_str[param_len] = '\0';
-            method->parameters = parse_parameters(param_str);
+            
+            // Trim whitespace from param_str
+            char* start = param_str;
+            char* end = param_str + strlen(param_str) - 1;
+            while (*start && isspace(*start)) start++;
+            while (end > start && isspace(*end)) *end-- = '\0';
+            
+            method->parameters = parse_parameters(start);
+            
+            // Count parameters
+            Parameter* param = method->parameters;
+            method->param_count = 0;
+            while (param && param->type) {
+                method->param_count++;
+                param++;
+            }
+            
             free(param_str);
         }
     }

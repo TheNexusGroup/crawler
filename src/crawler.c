@@ -228,7 +228,7 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
 static void processFile(DependencyCrawler* crawler, const char* file_path) {
     if (!crawler || !file_path) return;
     
-    logr(DEBUG, "[Crawler] Processing file: %s", file_path);
+    logr(VERBOSE, "[Crawler] Processing file: %s", file_path);
     
     // Read file content
     FILE* file = fopen(file_path, "r");
@@ -623,7 +623,7 @@ void freeCrawler(DependencyCrawler* crawler) {
 static void graphMethods(DependencyCrawler* crawler, const char* file_path, Method* methods) {
     if (!crawler || !file_path || !methods) return;
     
-    logr(DEBUG, "[Crawler] Adding methods to dependency graph from %s", file_path);
+    logr(VERBOSE, "[Crawler] Adding methods to dependency graph from %s", file_path);
     
     // Create new dependency node
     Dependency* dep = malloc(sizeof(Dependency));
@@ -641,7 +641,7 @@ static void graphMethods(DependencyCrawler* crawler, const char* file_path, Meth
     // Add to graph
     if (!crawler->dependency_graph) {
         crawler->dependency_graph = dep;
-        logr(DEBUG, "[Crawler] Created new dependency graph with methods");
+        logr(VERBOSE, "[Crawler] Created new dependency graph with methods");
     } else {
         // Find end of list and append
         Dependency* current = crawler->dependency_graph;
@@ -649,6 +649,6 @@ static void graphMethods(DependencyCrawler* crawler, const char* file_path, Meth
             current = current->next;
         }
         current->next = dep;
-        logr(DEBUG, "[Crawler] Added methods to existing dependency graph");
+        logr(VERBOSE, "[Crawler] Added methods to existing dependency graph");
     }
 }
