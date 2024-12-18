@@ -191,6 +191,7 @@ typedef struct MethodDefinition {
     int reference_count;
     char* return_type;
     Parameter* parameters;
+    int param_count;
 } MethodDefinition;
 
 

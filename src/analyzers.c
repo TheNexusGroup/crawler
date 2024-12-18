@@ -295,7 +295,22 @@ static void addMethod(const char* method_name, const char* file_path, const char
     def->name = strdup(method_name);
     def->defined_in = strdup(file_path);
     def->return_type = return_type ? strdup(return_type) : NULL;
-    def->parameters = params ? parse_parameters(params) : NULL;
+    
+    // Parse and store parameters
+    if (params) {
+        def->parameters = parse_parameters(params);
+        // Count parameters
+        Parameter* param = def->parameters;
+        def->param_count = 0;
+        while (param && param->type) {
+            def->param_count++;
+            param++;
+        }
+    } else {
+        def->parameters = NULL;
+        def->param_count = 0;
+    }
+    
     def->dependencies = NULL;
     def->references = NULL;
     def->reference_count = 0;
@@ -421,7 +436,19 @@ Method* analyzeMethod(const char* file_path, const char* content, const Language
         method->name = strdup(def->name);
         method->defined_in = strdup(def->defined_in);
         method->return_type = def->return_type ? strdup(def->return_type) : NULL;
-        method->parameters = def->parameters;  // Transfer parameter ownership
+        
+        // Copy parameters
+        if (def->parameters) {
+            method->param_count = def->param_count;
+            method->parameters = calloc(def->param_count + 1, sizeof(Parameter));
+            for (int j = 0; j < def->param_count; j++) {
+                method->parameters[j].type = def->parameters[j].type ? strdup(def->parameters[j].type) : NULL;
+                method->parameters[j].name = def->parameters[j].name ? strdup(def->parameters[j].name) : NULL;
+                method->parameters[j].default_value = def->parameters[j].default_value ? 
+                    strdup(def->parameters[j].default_value) : NULL;
+            }
+        }
+
         method->is_definition = true;
         
         // Convert references
