@@ -1,17 +1,17 @@
-#ifndef LANGUAGE_ANALYZERS_H
-#define LANGUAGE_ANALYZERS_H
+#ifndef ANALYZERS_H
+#define ANALYZERS_H
 
 #include "syntaxes.h"
+#include "grammars.h"
 
+// Core analysis functions
+ExtractedDependency* analyze_module(const char* content, const LanguageGrammar* grammar);
+Structure* analyze_structure(const char* content, const LanguageGrammar* grammar);
+Method* analyze_method(const char* content, const LanguageGrammar* grammar);
 
-// Process matches functions
-void process_module_matches(ExtractedDependency* dep, char** matches, size_t match_count);
-void process_struct_matches(ExtractedDependency* dep, char** matches, size_t match_count);
-void process_method_matches(ExtractedDependency* dep, char** matches, size_t match_count);
+// Dependency conversion helpers
+Dependency* create_dependency_from_extracted(ExtractedDependency* extracted);
+void add_to_dependency_graph(Dependency* graph, ExtractedDependency* extracted);
+void free_extracted_dependency(ExtractedDependency* dep);
 
-// Main analyzer function
-ExtractedDependency* analyze_dependencies(const char* content, 
-                                        LanguageType lang,
-                                        AnalysisLayer layer);
-
-#endif // LANGUAGE_ANALYZERS_H
+#endif // ANALYZERS_H

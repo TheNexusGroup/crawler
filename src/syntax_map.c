@@ -1,5 +1,6 @@
 #include "syntax_map.h"
 #include <string.h>
+#include <stdlib.h>
 
 void free_dependency(ExtractedDependency* dep) {
     while (dep) {

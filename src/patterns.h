@@ -36,9 +36,11 @@ static const char* C_MODULE_PATTERNS[] = {
 static const char* C_STRUCT_PATTERNS[] = {
     "^\\s*typedef\\s+struct\\s+([a-zA-Z0-9_]+)",  // Typedef struct
     "^\\s*struct\\s+([a-zA-Z0-9_]+)",            // Regular struct
+    "^\\s*class\\s+([a-zA-Z0-9_]+)(\\s*:\\s*[^{]+)?", // C++ class with inheritance
     "^\\s*typedef\\s+enum\\s+([a-zA-Z0-9_]+)",   // Typedef enum
     "^\\s*enum\\s+([a-zA-Z0-9_]+)",              // Regular enum
-    "^\\s*class\\s+([a-zA-Z0-9_]+)"              // C++ class
+    "^\\s*([a-zA-Z0-9_]+)\\s+([a-zA-Z0-9_]+);",  // Member variable declarations
+    "^\\s*template\\s*<[^>]+>\\s*class\\s+([a-zA-Z0-9_]+)"  // Template class
 };
 
 static const char* C_METHOD_PATTERNS[] = {

@@ -1,5 +1,7 @@
 #include "grammars.h"
 #include "patterns.h"
+#include "logger.h"
+#include <stddef.h>
 
 // Define the actual array
 const LanguageGrammar LANGUAGE_GRAMMARS[] = {
@@ -100,8 +102,25 @@ const size_t LANGUAGE_GRAMMAR_COUNT = sizeof(LANGUAGE_GRAMMARS) / sizeof(Languag
 
 // Implementation of languageGrammars function
 const LanguageGrammar* languageGrammars(LanguageType type) {
-    if (type < 0 || type >= LANGUAGE_GRAMMAR_COUNT) {
+    logr(DEBUG, "[Grammars] Looking up grammar for language type: %d", type);
+    
+    if (type < 0) {
+        logr(ERROR, "[Grammars] Invalid language type: %d", type);
         return NULL;
     }
-    return &LANGUAGE_GRAMMARS[type];
+    
+    if (type >= LANGUAGE_GRAMMAR_COUNT) {
+        logr(ERROR, "[Grammars] Language type %d exceeds grammar count %zu", 
+             type, LANGUAGE_GRAMMAR_COUNT);
+        return NULL;
+    }
+    
+    const LanguageGrammar* grammar = &LANGUAGE_GRAMMARS[type];
+    if (!grammar->module_patterns || grammar->module_pattern_count == 0) {
+        logr(ERROR, "[Grammars] Invalid grammar configuration for language type %d", type);
+        return NULL;
+    }
+    
+    logr(DEBUG, "[Grammars] Successfully found grammar for language type %d", type);
+    return grammar;
 }

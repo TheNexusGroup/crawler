@@ -29,6 +29,8 @@ typedef enum {
     LANG_SVELTE,
 } LanguageType;
 
+// Language type functions
+LanguageType languageType(const char* filename);
 const char* languageName(LanguageType type);
 
 // Layer definitions for granular analysis
@@ -95,25 +97,27 @@ typedef struct Structure {
 } Structure;
 
 typedef struct ExtractedDependency {
-    char* module_name;
     char* file_path;
+    char* target;
+    char* module_name;
     Structure* structures;
     int structure_count;
     Method* methods;
     int method_count;
-    DependencyFeatures features;
+    LanguageType language;
     AnalysisLayer layer;
-    int depth;
-    char* target;
-    ExtractedDependency* next;
+    struct ExtractedDependency* next;
+    struct ExtractedDependency* modules;
 } ExtractedDependency;
 
 typedef struct Dependency {
     char* source;
     char* target;
-    AnalysisLayer level;
     LanguageType language;
-    Dependency* next;
+    AnalysisLayer level;
+    Method* methods;
+    int method_count;
+    struct Dependency* next;
 } Dependency;
 
 // Language-specific syntax patterns for each layer
@@ -135,8 +139,6 @@ typedef struct {
 
 // Function prototypes for multi-layer analysis
 ExtractedDependency* analyze_file(const char* file_path, AnalysisConfig* config);
-Structure* analyze_structure(const char* file_content, const char* struct_name);
-Method* analyze_method(const char* method_content);
 
 // Language-specific analyzers
 typedef struct {

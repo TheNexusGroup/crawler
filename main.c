@@ -1,5 +1,6 @@
 #include "src/crawler.h"
 #include "src/syntaxes.h"
+#include "src/logger.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -117,6 +118,7 @@ static void free_options(CrawlerOptions* options) {
 }
 
 int main(int argc, char* argv[]) {
+    // set_log_level(INFO);
     printf("Starting dependency crawler...\n");
     
     // Parse command line arguments

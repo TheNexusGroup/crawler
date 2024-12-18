@@ -2,108 +2,84 @@
 #include "grammars.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+#include "logger.h"
 
 // Global pattern cache instance
 PatternCache pattern_cache = {0};
 
 int initPatternCache(void) {
-    //printf("Initializing pattern cache...\n");
+    logr(DEBUG, "[PatternCache] Initializing pattern cache");
     
-    if (pattern_cache.initialized) {
-        //printf("Pattern cache already initialized\n");
-        return 0;
-    }
-
-    // Initialize for each language
-    for (LanguageType lang = LANG_RUST; lang <= LANG_SVELTE; lang++) {
-        //printf("Processing language %d...\n", lang);
-        
+    // Initialize all patterns to zero
+    memset(&pattern_cache, 0, sizeof(PatternCache));
+    pattern_cache.initialized = 0;  // Explicitly mark as not initialized
+    
+    // For each language type
+    for (LanguageType lang = 0; lang < LANGUAGE_GRAMMAR_COUNT; lang++) {
         const LanguageGrammar* grammar = languageGrammars(lang);
         if (!grammar) {
-            //printf("Failed to get grammar for language %d\n", lang);
-            continue;
+            logr(ERROR, "[PatternCache] Failed to get grammar for language %d", lang);
+            return 0;
         }
-
-        // Allocate and compile module patterns
-        //printf("Compiling %zu module patterns...\n", grammar->module_pattern_count);
+        
+        // Compile module patterns
         pattern_cache.module_patterns[lang].compiled_patterns = 
-            malloc(sizeof(regex_t) * grammar->module_pattern_count);
+            malloc(grammar->module_pattern_count * sizeof(regex_t));
         if (!pattern_cache.module_patterns[lang].compiled_patterns) {
-            //printf("Failed to allocate memory for module patterns\n");
-            return -1;
+            logr(ERROR, "[PatternCache] Failed to allocate memory for module patterns");
+            return 0;
         }
+        
         pattern_cache.module_patterns[lang].pattern_count = grammar->module_pattern_count;
-
         for (size_t i = 0; i < grammar->module_pattern_count; i++) {
-            //printf("Compiling module pattern: %s\n", grammar->module_patterns[i]);
-            int result = regcomp(&pattern_cache.module_patterns[lang].compiled_patterns[i],
-                                grammar->module_patterns[i], REG_EXTENDED);
-            if (result != 0) {
-                char error_buf[100];
-                regerror(result, &pattern_cache.module_patterns[lang].compiled_patterns[i],
-                        error_buf, sizeof(error_buf));
-                //printf("Regex compilation failed: %s\n", error_buf);
-                cleanPatternCache();
-                return -1;
-            }
-        }
-
-        // Allocate and compile struct patterns
-        //printf("Compiling %zu struct patterns...\n", grammar->struct_pattern_count);
-        pattern_cache.struct_patterns[lang].compiled_patterns = 
-            malloc(sizeof(regex_t) * grammar->struct_pattern_count);
-        if (!pattern_cache.struct_patterns[lang].compiled_patterns) {
-            //printf("Failed to allocate memory for struct patterns\n");
-            cleanPatternCache();
-            return -1;
-        }
-        pattern_cache.struct_patterns[lang].pattern_count = grammar->struct_pattern_count;
-
-        for (size_t i = 0; i < grammar->struct_pattern_count; i++) {
-            //printf("Compiling struct pattern: %s\n", grammar->struct_patterns[i]);
-            int result = regcomp(&pattern_cache.struct_patterns[lang].compiled_patterns[i],
-                                grammar->struct_patterns[i], REG_EXTENDED);
-            if (result != 0) {
-                char error_buf[100];
-                regerror(result, &pattern_cache.struct_patterns[lang].compiled_patterns[i],
-                        error_buf, sizeof(error_buf));
-                //printf("Regex compilation failed: %s\n", error_buf);
-                cleanPatternCache();
-                return -1;
-            }
-        }
-
-        // Allocate and compile method patterns
-        //printf("Compiling %zu method patterns...\n", grammar->method_pattern_count);
-        pattern_cache.method_patterns[lang].compiled_patterns = 
-            malloc(sizeof(regex_t) * grammar->method_pattern_count);
-        if (!pattern_cache.method_patterns[lang].compiled_patterns) {
-            //printf("Failed to allocate memory for method patterns\n");
-            cleanPatternCache();
-            return -1;
-        }
-        pattern_cache.method_patterns[lang].pattern_count = grammar->method_pattern_count;
-
-        for (size_t i = 0; i < grammar->method_pattern_count; i++) {
-            //printf("Compiling method pattern: %s\n", grammar->method_patterns[i]);
-            int result = regcomp(&pattern_cache.method_patterns[lang].compiled_patterns[i],
-                                grammar->method_patterns[i], REG_EXTENDED);
-            if (result != 0) {
-                char error_buf[100];
-                regerror(result, &pattern_cache.method_patterns[lang].compiled_patterns[i],
-                        error_buf, sizeof(error_buf));
-                //printf("Regex compilation failed: %s\n", error_buf);
-                cleanPatternCache();
-                return -1;
+            if (regcomp(&pattern_cache.module_patterns[lang].compiled_patterns[i],
+                       grammar->module_patterns[i], REG_EXTENDED) != 0) {
+                logr(ERROR, "[PatternCache] Failed to compile module pattern %zu for language %d", i, lang);
+                return 0;
             }
         }
         
-        //printf("Successfully processed language %d\n", lang);
+        // Compile struct patterns
+        pattern_cache.struct_patterns[lang].compiled_patterns = 
+            malloc(grammar->struct_pattern_count * sizeof(regex_t));
+        if (!pattern_cache.struct_patterns[lang].compiled_patterns) {
+            logr(ERROR, "[PatternCache] Failed to allocate memory for struct patterns");
+            return 0;
+        }
+        
+        pattern_cache.struct_patterns[lang].pattern_count = grammar->struct_pattern_count;
+        for (size_t i = 0; i < grammar->struct_pattern_count; i++) {
+            logr(DEBUG, "[PatternCache] Compiling struct pattern %zu for language %d: %s", 
+                 i, lang, grammar->struct_patterns[i]);
+            if (regcomp(&pattern_cache.struct_patterns[lang].compiled_patterns[i],
+                       grammar->struct_patterns[i], REG_EXTENDED) != 0) {
+                logr(ERROR, "[PatternCache] Failed to compile struct pattern %zu for language %d", i, lang);
+                return 0;
+            }
+        }
+        
+        // Compile method patterns
+        pattern_cache.method_patterns[lang].compiled_patterns = 
+            malloc(grammar->method_pattern_count * sizeof(regex_t));
+        if (!pattern_cache.method_patterns[lang].compiled_patterns) {
+            logr(ERROR, "[PatternCache] Failed to allocate memory for method patterns");
+            return 0;
+        }
+        
+        pattern_cache.method_patterns[lang].pattern_count = grammar->method_pattern_count;
+        for (size_t i = 0; i < grammar->method_pattern_count; i++) {
+            if (regcomp(&pattern_cache.method_patterns[lang].compiled_patterns[i],
+                       grammar->method_patterns[i], REG_EXTENDED) != 0) {
+                logr(ERROR, "[PatternCache] Failed to compile method pattern %zu for language %d", i, lang);
+                return 0;
+            }
+        }
     }
-
-    pattern_cache.initialized = 1;
-    //printf("Pattern cache initialization complete\n");
-    return 0;
+    
+    pattern_cache.initialized = 1;  // Mark as initialized if successful
+    logr(DEBUG, "[PatternCache] Pattern cache initialized successfully");
+    return pattern_cache.initialized;
 }
 
 void cleanPatternCache(void) {

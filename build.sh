@@ -24,6 +24,7 @@ SOURCES=(
     "src/grammars.c"
     "src/pattern_cache.c"
     "main.c"
+    "src/logger.c"
 )
 
 # Object files

@@ -3,6 +3,43 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "analyzers.h"
+
+// Add at the top of the file, after includes
+LanguageType languageType(const char* filename) {
+    static const struct {
+        const char* ext;
+        LanguageType type;
+    } extension_map[] = {
+        {"rs", LANG_RUST},
+        {"c", LANG_C},
+        {"h", LANG_C}, 
+        {"cpp", LANG_C},
+        {"hpp", LANG_C},
+        {"hxx", LANG_C},
+        {"cxx", LANG_C},
+        {"ts", LANG_JAVASCRIPT},
+        {"js", LANG_JAVASCRIPT},
+        {"go", LANG_GO},
+        {"py", LANG_PYTHON}, 
+        {"java", LANG_JAVA},
+        {"php", LANG_PHP},
+        {"rb", LANG_RUBY},
+        {"svelte", LANG_SVELTE}
+    };
+    
+    const char* dot = strrchr(filename, '.');
+    if (!dot) return (LanguageType)-1;
+    
+    const char* ext = dot + 1;
+    for (size_t i = 0; i < sizeof(extension_map) / sizeof(extension_map[0]); i++) {
+        if (strcmp(ext, extension_map[i].ext) == 0) {
+            return extension_map[i].type;
+        }
+    }
+    
+    return (LanguageType)-1;
+}
 
 // Analyze a file based on the given configuration
 ExtractedDependency* analyze_file(const char* file_path, AnalysisConfig* config) {
@@ -34,21 +71,25 @@ ExtractedDependency* analyze_file(const char* file_path, AnalysisConfig* config)
     memset(dep, 0, sizeof(ExtractedDependency));
     dep->file_path = strdup(file_path);
 
+    // Get the grammar for this language
+    LanguageType lang = languageType(file_path);
+    const LanguageGrammar* grammar = languageGrammars(lang);
+
     // Analyze each layer according to config
     if (config->analyze_modules) {
-        // TODO: Implement module analysis
+        dep->modules = analyze_module(content, grammar);
         dep->layer = LAYER_MODULE;
     }
     if (config->analyze_structures) {
         // Analyze structures in the file
-        dep->structures = analyze_structure(content, NULL);
+        dep->structures = analyze_structure(content, grammar);
         if (dep->structures) {
             dep->structure_count = 1; // Update based on actual count
         }
     }
     if (config->analyze_methods) {
         // Analyze methods not associated with structures
-        dep->methods = analyze_method(content);
+        dep->methods = analyze_method(content, grammar);
         if (dep->methods) {
             dep->method_count = 1; // Update based on actual count
         }
@@ -56,44 +97,6 @@ ExtractedDependency* analyze_file(const char* file_path, AnalysisConfig* config)
 
     free(content);
     return dep;
-}
-
-// Analyze structure definitions in the content
-Structure* analyze_structure(const char* file_content, const char* struct_name) {
-    if (!file_content) return NULL;
-
-    Structure* structure = malloc(sizeof(Structure));
-    memset(structure, 0, sizeof(Structure));
-
-    if (struct_name) {
-        structure->name = strdup(struct_name);
-    }
-
-    // Initialize arrays
-    structure->methods = malloc(sizeof(Method) * MAX_METHODS_PER_STRUCT);
-    structure->implemented_traits = malloc(sizeof(char*) * MAX_TRAITS_PER_STRUCT);
-    structure->dependencies = malloc(sizeof(char*) * MAX_DEPENDENCIES);
-
-    // TODO: Implement pattern matching for structure analysis
-    // This would use the pattern_cache to find structure definitions
-
-    return structure;
-}
-
-// Analyze method definitions
-Method* analyze_method(const char* method_content) {
-    if (!method_content) return NULL;
-
-    Method* method = malloc(sizeof(Method));
-    memset(method, 0, sizeof(Method));
-
-    // Initialize parameters array
-    method->param_count = 0;
-
-    // TODO: Implement pattern matching for method analysis
-    // This would use the pattern_cache to find method definitions
-
-    return method;
 }
 
 // Create a dependency graph from extracted dependencies
@@ -120,15 +123,34 @@ DependencyGraph* create_dependency_graph(ExtractedDependency** deps, int dep_cou
         }
 
         // Process structure-level relationships
-        for (int j = 0; j < dep->structure_count; j++) {
-            Structure* structure = &dep->structures[j];
-            for (int k = 0; k < structure->dependency_count; k++) {
-                Relationship* rel = malloc(sizeof(Relationship));
-                rel->from = strdup(structure->name);
-                rel->to = strdup(structure->dependencies);
-                rel->relationship_type = strdup("depends_on");
-                rel->layer = LAYER_STRUCT;
-                graph->relationships[graph->relationship_count++] = rel;
+        if (dep->structures) {
+            Structure* curr_struct = dep->structures;
+            while (curr_struct) {
+                if (curr_struct->dependencies) {
+                    Relationship* rel = malloc(sizeof(Relationship));
+                    rel->from = strdup(curr_struct->name);
+                    rel->to = strdup(curr_struct->dependencies);
+                    rel->relationship_type = strdup("inherits");
+                    rel->layer = LAYER_STRUCT;
+                    graph->relationships[graph->relationship_count++] = rel;
+                }
+                curr_struct = curr_struct->next;
+            }
+        }
+
+        // Process method-level relationships
+        if (dep->methods) {
+            Method* curr_method = dep->methods;
+            while (curr_method) {
+                if (curr_method->dependencies) {
+                    Relationship* rel = malloc(sizeof(Relationship));
+                    rel->from = strdup(curr_method->name);
+                    rel->to = strdup(curr_method->dependencies);
+                    rel->relationship_type = strdup("calls");
+                    rel->layer = LAYER_METHOD;
+                    graph->relationships[graph->relationship_count++] = rel;
+                }
+                curr_method = curr_method->next;
             }
         }
     }
