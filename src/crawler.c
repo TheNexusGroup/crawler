@@ -56,7 +56,7 @@ DependencyCrawler* create_crawler(char** directories, int directory_count, Analy
             free_crawler(crawler);
             return NULL;
         }
-        logr(DEBUG, "[Crawler] Added directory: %s", crawler->root_directories[i]);
+        logr(VERBOSE, "[Crawler] Added directory: %s", crawler->root_directories[i]);
     }
     
     crawler->parsers = NULL;
@@ -64,14 +64,14 @@ DependencyCrawler* create_crawler(char** directories, int directory_count, Analy
     crawler->dependency_graph = NULL;
     crawler->result_graph = NULL;
     
-    logr(DEBUG, "[Crawler] Crawler instance created successfully");
+    logr(VERBOSE, "[Crawler] Crawler instance created successfully");
     return crawler;
 }
 
 // Register a language-specific parser
 void register_language_parser(DependencyCrawler* crawler, LanguageType type,
                             const LanguageParser* parser) {
-    logr(DEBUG, "[Crawler] Registering parser for language type %d", type);
+    logr(VERBOSE, "[Crawler] Registering parser for language %s", languageName(type));
     crawler->parser_count++;
     crawler->parsers = (LanguageParser*)realloc(crawler->parsers, 
                                                sizeof(LanguageParser) * crawler->parser_count);
@@ -90,16 +90,16 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
         return;
     }
     
-    logr(DEBUG, "[Crawler] Processing layer for file: %s", filepath);
+    logr(VERBOSE, "[Crawler] Processing layer for file: %s", filepath);
     
     // Analyze based on configuration
     if (crawler->analysis_config.analyze_modules) {
-        logr(DEBUG, "[Crawler] Analyzing modules for file: %s", filepath);
+        logr(VERBOSE, "[Crawler] Analyzing modules for file: %s", filepath);
         ExtractedDependency* deps = analyze_module(content, grammar);
         ExtractedDependency* current_dep = deps;
         
         while (current_dep) {
-            logr(DEBUG, "[Crawler] Processing module dependency: %s", 
+            logr(VERBOSE, "[Crawler] Processing module dependency: %s", 
                  current_dep->target ? current_dep->target : "NULL");
             
             ExtractedDependency* temp_dep = malloc(sizeof(ExtractedDependency));
@@ -113,15 +113,15 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
             temp_dep->target = current_dep->target ? strdup(current_dep->target) : NULL;
             temp_dep->layer = LAYER_MODULE;
             
-            logr(DEBUG, "[Crawler] Adding module dependency to graph: %s -> %s", 
+            logr(VERBOSE, "[Crawler] Adding module dependency to graph: %s -> %s", 
                  temp_dep->file_path, temp_dep->target ? temp_dep->target : "NULL");
             
             if (!crawler->dependency_graph) {
                 crawler->dependency_graph = create_dependency_from_extracted(temp_dep);
-                logr(DEBUG, "[Crawler] Created new dependency graph");
+                logr(VERBOSE, "[Crawler] Created new dependency graph");
             } else {
                 add_to_dependency_graph(crawler->dependency_graph, temp_dep);
-                logr(DEBUG, "[Crawler] Added to existing dependency graph");
+                logr(VERBOSE, "[Crawler] Added to existing dependency graph");
             }
             
             free_extracted_dependency(temp_dep);
@@ -131,10 +131,10 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
     }
 
     if (crawler->analysis_config.analyze_structures) {
-        logr(DEBUG, "[Crawler] Analyzing structures in %s", filepath);
+        logr(VERBOSE, "[Crawler] Analyzing structures in %s", filepath);
         Structure* structs = analyze_structure(content, filepath, grammar);
         if (structs) {
-            logr(DEBUG, "[Crawler] Found structure dependencies");
+            logr(VERBOSE, "[Crawler] Found structure dependencies");
             ExtractedDependency* struct_dep = malloc(sizeof(ExtractedDependency));
             if (!struct_dep) {
                 logr(ERROR, "[Crawler] Failed to allocate memory for structure dependency");
@@ -149,7 +149,7 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
             // Track type source locations
             Structure* curr_struct = structs;
             while (curr_struct) {
-                logr(DEBUG, "[Crawler] Processing structure: %s", 
+                logr(VERBOSE, "[Crawler] Processing structure: %s", 
                      curr_struct->name ? curr_struct->name : "NULL");
                 
                 // Check for type dependencies in includes/imports
@@ -157,13 +157,13 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
                 ExtractedDependency* curr_dep = type_deps;
                 
                 while (curr_dep) {
-                    logr(DEBUG, "[Crawler] Checking type dependency: %s", 
+                    logr(VERBOSE, "[Crawler] Checking type dependency: %s", 
                          curr_dep->target ? curr_dep->target : "NULL");
                     
                     // If this include/import contains our dependent type
                     if (curr_dep->target && curr_struct->dependencies && 
                         strstr(curr_struct->dependencies, curr_dep->target)) {
-                        logr(DEBUG, "[Crawler] Found type source: %s in %s", 
+                        logr(VERBOSE, "[Crawler] Found type source: %s in %s", 
                              curr_struct->dependencies, curr_dep->file_path);
                         
                         // Add source file information to the dependency
@@ -177,7 +177,7 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
                                    curr_struct->dependencies ? curr_struct->dependencies : "");
                             free(curr_struct->dependencies);
                             curr_struct->dependencies = full_dep;
-                            logr(DEBUG, "[Crawler] Updated dependency info: %s", full_dep);
+                            logr(VERBOSE, "[Crawler] Updated dependency info: %s", full_dep);
                         } else {
                             logr(ERROR, "[Crawler] Failed to allocate memory for full dependency");
                         }
@@ -188,13 +188,13 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
                 curr_struct = curr_struct->next;
             }
             
-            logr(DEBUG, "[Crawler] Adding structure dependencies to graph");
+            logr(VERBOSE, "[Crawler] Adding structure dependencies to graph");
             if (!crawler->dependency_graph) {
                 crawler->dependency_graph = create_dependency_from_extracted(struct_dep);
-                logr(DEBUG, "[Crawler] Created new dependency graph for structures");
+                logr(VERBOSE, "[Crawler] Created new dependency graph for structures");
             } else {
                 add_to_dependency_graph(crawler->dependency_graph, struct_dep);
-                logr(DEBUG, "[Crawler] Added structures to existing dependency graph");
+                logr(VERBOSE, "[Crawler] Added structures to existing dependency graph");
             }
             
             free_extracted_dependency(struct_dep);
@@ -233,7 +233,7 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
         }
     }
     
-    logr(DEBUG, "[Crawler] Finished processing layer for file: %s", filepath);
+    logr(VERBOSE, "[Crawler] Finished processing layer for file: %s", filepath);
 }
 
 // Process a single file
@@ -247,19 +247,20 @@ static int process_file(DependencyCrawler* crawler, const char* filepath) {
     
     // Get language type from syntaxes.h
     LanguageType lang = languageType(filepath);
+    const char* lang_name = languageName(lang);
     if (lang == (LanguageType)-1) {
-        logr(DEBUG, "[Crawler] Unsupported file type: %s", filepath);
+        logr(WARN, "[Crawler] Unsupported file type: %s", filepath);
         return 0;
     }
-    logr(DEBUG, "[Crawler] Detected language type: %d for file: %s", lang, filepath);
+    logr(VERBOSE, "[Crawler] Detected language: %s for file: %s", lang_name, filepath);
     
     // Get grammar for language
     const LanguageGrammar* grammar = languageGrammars(lang);
     if (!grammar) {
-        logr(ERROR, "[Crawler] Failed to get grammar for language type %d", lang);
+        logr(WARN, "[Crawler] Failed to get grammar for language: %s", lang_name);
         return 0;
     }
-    logr(DEBUG, "[Crawler] Found grammar for language type %d", lang);
+    logr(VERBOSE, "[Crawler] Found grammar for language: %s", lang_name);
     
     // Read file content
     FILE* file = fopen(filepath, "r");
@@ -267,7 +268,7 @@ static int process_file(DependencyCrawler* crawler, const char* filepath) {
         logr(ERROR, "[Crawler] Failed to open file: %s", filepath);
         return 0;
     }
-    logr(DEBUG, "[Crawler] Successfully opened file: %s", filepath);
+    logr(VERBOSE, "[Crawler] Successfully opened file: %s", filepath);
     
     // Get file size
     fseek(file, 0, SEEK_END);
@@ -283,12 +284,12 @@ static int process_file(DependencyCrawler* crawler, const char* filepath) {
     }
     
     // Read content
-    logr(DEBUG, "[Crawler] Reading file content for: %s", filepath);
+    logr(VERBOSE, "[Crawler] Reading file content for: %s", filepath);
     size_t read_size = fread(content, 1, size, file);
     content[read_size] = '\0';
     fclose(file);
     
-    logr(DEBUG, "[Crawler] Successfully read file content, processing with grammar");
+    logr(VERBOSE, "[Crawler] Successfully read file content, processing with grammar");
     
     // Process with grammar and set language type
     ExtractedDependency* deps = analyze_module(content, grammar);
@@ -299,7 +300,7 @@ static int process_file(DependencyCrawler* crawler, const char* filepath) {
     processLayer(crawler, filepath, content, grammar);
     
     free(content);
-    logr(DEBUG, "[Crawler] Finished processing file: %s", filepath);
+    logr(VERBOSE, "[Crawler] Finished processing file: %s", filepath);
     return 1;
 }
 
@@ -310,7 +311,7 @@ static void crawl_directory(DependencyCrawler* crawler, const char* dir_path) {
         return;
     }
 
-    logr(DEBUG, "[Crawler] Opening directory: %s", dir_path);
+    logr(VERBOSE, "[Crawler] Opening directory: %s", dir_path);
     DIR* dir = opendir(dir_path);
     if (!dir) {
         logr(ERROR, "[Crawler] Failed to open directory: %s", dir_path);
@@ -323,7 +324,7 @@ static void crawl_directory(DependencyCrawler* crawler, const char* dir_path) {
         
         char path[1024];
         snprintf(path, sizeof(path), "%s/%s", dir_path, entry->d_name);
-        logr(DEBUG, "[Crawler] Processing entry: %s", path);
+        logr(VERBOSE, "[Crawler] Processing entry: %s", path);
         
         struct stat statbuf;
         if (stat(path, &statbuf) != 0) {
@@ -332,10 +333,10 @@ static void crawl_directory(DependencyCrawler* crawler, const char* dir_path) {
         }
         
         if (S_ISDIR(statbuf.st_mode)) {
-            logr(DEBUG, "[Crawler] Found directory: %s", path);
+            logr(VERBOSE, "[Crawler] Found directory: %s", path);
             crawl_directory(crawler, path);
         } else {
-            logr(DEBUG, "[Crawler] Found file: %s", path);
+            logr(VERBOSE, "[Crawler] Found file: %s", path);
             if (!process_file(crawler, path)) {
                 logr(ERROR, "[Crawler] Failed to process file: %s", path);
             }
@@ -343,12 +344,12 @@ static void crawl_directory(DependencyCrawler* crawler, const char* dir_path) {
     }
     
     closedir(dir);
-    logr(DEBUG, "[Crawler] Finished processing directory: %s", dir_path);
+    logr(VERBOSE, "[Crawler] Finished processing directory: %s", dir_path);
 }
 
 // Main crawling function
 void crawl_dependencies(DependencyCrawler* crawler) {
-    logr(DEBUG, "[Crawler] Starting dependency crawl for %d directories", crawler->directory_count);
+    logr(INFO, "[Crawler] Starting dependency crawl for %d directories", crawler->directory_count);
     if (!crawler || !crawler->root_directories) {
         logr(ERROR, "[Crawler] Invalid crawler instance");
         return;
@@ -399,80 +400,88 @@ void print_dependencies(DependencyCrawler* crawler) {
         return;
     }
 
-    logr(INFO, "[Crawler] Dependencies by Layer");
-    logr(INFO, "==========================\n");
-    
-    // Module Dependencies
-    logr(INFO, "Module Dependencies:");
-    logr(INFO, "-----------------");
     Dependency* current = crawler->dependency_graph;
     int module_count = 0;
-    char* current_file = NULL;
-    Dependency* dep = crawler->dependency_graph;
-    while (dep) {
-        if (!current_file || strcmp(current_file, dep->source) != 0) {
-            if (current_file) free(current_file);
-            current_file = strdup(dep->source);
-            logr(INFO, "  %s", current_file);
-        }
-        
-        // Check if this is the last dependency for this source file
-        Dependency* next_with_same_source = dep->next;
-        while (next_with_same_source && strcmp(next_with_same_source->source, current_file) != 0) {
-            next_with_same_source = next_with_same_source->next;
-        }
-        
-        // Use └── for last item, ├── for others
-        const char* prefix = next_with_same_source ? "├──" : "└──";
-        logr(INFO, "    %s %s", prefix, dep->target);
-        module_count++;
-        
-        dep = dep->next;
-    }
-    logr(INFO, "Total Module Dependencies: %d\n", module_count);
-    free(current_file);
-    
-    // Structure Dependencies
-    logr(INFO, "Structure Dependencies:");
-    logr(INFO, "--------------------");
-    size_t def_count;
-    size_t struct_count = 0;
-    StructureDefinition* defs = get_structure_definitions(&def_count);
-    
-    for (size_t i = 0; i < def_count; i++) {
-        StructureDefinition* def = &defs[i];
-        logr(INFO, "  %s %s (defined in %s)", 
-            def->type,
-            def->name,
-            def->defined_in);
-        if (def->reference_count > 0) {
-            logr(INFO, "    Referenced in:");
-            for (int j = 0; j < def->reference_count; j++) {
-                // Use ├── for all but the last reference, └── for the last one
-                const char* prefix = (j == def->reference_count - 1) ? "└──" : "├──";
-                logr(INFO, "      %s %s", prefix, def->referenced_in[j]);
-            }
-            struct_count++;
-        }
-    }
-    logr(INFO, "Total Structure Dependencies: %zu\n", struct_count);
-
-    // Method Dependencies
-    logr(INFO, "Method Dependencies:");
-    logr(INFO, "-----------------");
-    current = crawler->dependency_graph;
+    int struct_count = 0;
     int method_count = 0;
-    while (current) {
-        if (current->level == LAYER_METHOD) {
-            method_count++;
-            logr(INFO, "  %s", current->source);
-            if (current->methods) {
-                print_method_tree(current->methods, 1);
+
+    logr(INFO, "[Crawler] Dependencies by Layer");
+    logr(INFO, "==========================\n");
+    if (crawler->analysis_config.analyze_modules) {
+        // Module Dependencies
+        logr(INFO, "Module Dependencies:");
+        logr(INFO, "-----------------");
+        char* current_file = NULL;
+        Dependency* dep = crawler->dependency_graph;
+        while (dep) {
+            if (!current_file || strcmp(current_file, dep->source) != 0) {
+                if (current_file) free(current_file);
+                current_file = strdup(dep->source);
+                logr(INFO, "  %s", current_file);
+            }
+            
+            // Check if this is the last dependency for this source file
+            Dependency* next_with_same_source = dep->next;
+            while (next_with_same_source && strcmp(next_with_same_source->source, current_file) != 0) {
+                next_with_same_source = next_with_same_source->next;
+            }
+            
+            // Use └── for last item, ├── for others
+            const char* prefix = next_with_same_source ? "├──" : "└──";
+            logr(INFO, "    %s %s", prefix, dep->target);
+            module_count++;
+        
+            dep = dep->next;
+        }
+        logr(INFO, "Total Module Dependencies: %d\n", module_count);
+        free(current_file);
+    }
+    
+    if (crawler->analysis_config.analyze_structures) {
+        // Structure Dependencies
+        logr(INFO, "Structure Dependencies:");
+        logr(INFO, "--------------------");
+        size_t def_count;
+        size_t struct_count = 0;
+        StructureDefinition* defs = get_structure_definitions(&def_count);
+    
+        for (size_t i = 0; i < def_count; i++) {
+            StructureDefinition* def = &defs[i];
+            logr(INFO, "  %s %s (defined in %s)", 
+                def->type,
+                def->name,
+                def->defined_in);
+            if (def->reference_count > 0) {
+                logr(INFO, "    Referenced in:");
+                for (int j = 0; j < def->reference_count; j++) {
+                    // Use ├── for all but the last reference, └── for the last one
+                    const char* prefix = (j == def->reference_count - 1) ? "└──" : "├──";
+                    logr(INFO, "      %s %s", prefix, def->referenced_in[j]);
+                }
+                struct_count++;
             }
         }
-        current = current->next;
+        logr(INFO, "Total Structure Dependencies: %zu\n", struct_count);
     }
-    logr(INFO, "Total Method Dependencies: %d\n", method_count);
+
+    if (crawler->analysis_config.analyze_methods) {
+        // Method Dependencies
+        logr(INFO, "Method Dependencies:");
+        logr(INFO, "-----------------");
+        current = crawler->dependency_graph;
+        
+        while (current) {
+            if (current->level == LAYER_METHOD) {
+                method_count++;
+                logr(INFO, "  %s", current->source);
+                if (current->methods) {
+                    print_method_tree(current->methods, 1);
+                }
+            }
+            current = current->next;
+        }
+        logr(INFO, "Total Method Dependencies: %d\n", method_count);
+    }
 
     logr(INFO, "\nTotal Dependencies: %zu", module_count + struct_count + method_count);
 }

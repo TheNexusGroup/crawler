@@ -46,17 +46,14 @@ static const char* C_STRUCT_PATTERNS[] = {
 };
 
 static const char* C_METHOD_PATTERNS[] = {
-    // Match standard C function definitions with optional modifiers and return type
-    "^[\\s*]*([a-zA-Z_][a-zA-Z0-9_]*[\\s*]+)+([a-zA-Z_][a-zA-Z0-9_]*)[\\s*]*\\([^)]*\\)[\\s*]*\\{",
+    // Basic function definition - more permissive
+    "^[^;]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\)\\s*\\{",
     
-    // Match function declarations in header files (ending with semicolon)
-    "^[\\s*]*([a-zA-Z_][a-zA-Z0-9_]*[\\s*]+)+([a-zA-Z_][a-zA-Z0-9_]*)[\\s*]*\\([^)]*\\)[\\s*]*;",
+    // Function declaration
+    "^[^;]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\);",
     
-    // Match function pointer typedefs
-    "^\\s*typedef\\s+([a-zA-Z_][a-zA-Z0-9_]*[\\s*]+)*\\(\\s*\\*\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\)\\s*\\([^)]*\\)",
-    
-    // Match functions with attributes
-    "^\\s*__attribute__\\s*\\(\\([^)]*\\)\\)\\s*([a-zA-Z_][a-zA-Z0-9_]*[\\s*]+)+([a-zA-Z_][a-zA-Z0-9_]*)[\\s*]*\\("
+    // Function with storage class specifiers
+    "^\\s*(static|extern|inline)\\s+[^;]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\)"
 };
 
 // JavaScript/TypeScript patterns

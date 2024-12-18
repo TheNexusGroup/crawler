@@ -131,8 +131,8 @@ int main(int argc, char* argv[]) {
 
     // Create analysis configuration
     AnalysisConfig config = {
-        .analyze_modules = 1,
-        .analyze_structures = 1,
+        .analyze_modules = 0,
+        .analyze_structures = 0,
         .analyze_methods = 1,
         .max_depth = options.depth,
         .follow_external = (options.lib_count > 0)

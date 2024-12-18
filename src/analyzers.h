@@ -17,6 +17,14 @@ typedef struct {
 extern StructureDefinition* structure_definitions;
 extern size_t structure_def_count;
 
+// Add this at the top with other structs if not already present
+typedef struct ScopeContext {
+    char* class_name;    
+    char* namespace_name;
+    char* scope_type;
+    int brace_depth;    
+} ScopeContext;
+
 // Method definition tracking
 typedef struct {
     char* name;
@@ -25,6 +33,7 @@ typedef struct {
     int reference_count;
     char** referenced_in;
     size_t max_references;
+    char* scope;
 } MethodDefinition;
 
 extern MethodDefinition* method_definitions;

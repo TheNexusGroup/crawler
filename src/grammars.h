@@ -12,6 +12,8 @@ typedef struct {
     size_t struct_pattern_count;
     const char** method_patterns;
     size_t method_pattern_count;
+    int method_name_group;
+    const char* scope_separator;
 } LanguageGrammar;
 
 extern const LanguageGrammar LANGUAGE_GRAMMARS[];

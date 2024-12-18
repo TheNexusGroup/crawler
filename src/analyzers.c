@@ -188,6 +188,21 @@ Parameter* parse_parameters(const char* params_str) {
     return params;
 }
 
+// Helper function to check if we're within a valid scope
+static bool is_within_scope(const char* content, size_t position, ScopeContext* context) {
+    // Count braces from start of scope definition to current position
+    const char* pos = content;
+    int brace_count = 0;
+    
+    while (pos < content + position) {
+        if (*pos == '{') brace_count++;
+        else if (*pos == '}') brace_count--;
+        pos++;
+    }
+    
+    return brace_count > 0;
+}
+
 Method* analyze_method(const char* file_path, const char* content, const LanguageGrammar* grammar) {
     logr(DEBUG, "[Analyzer] Starting method analysis for file: %s", file_path);
     
@@ -373,7 +388,11 @@ ExtractedDependency* analyze_module(const char* content, const LanguageGrammar* 
     return head;
 }
 
+
+
 void collect_method_definitions(const char* file_path, const char* content, const LanguageGrammar* grammar) {
+    logr(DEBUG, "[Analyzer] Starting method definition collection for file: %s", file_path);
+    
     if (!method_definitions) {
         method_definitions = calloc(MAX_METHOD_DEFS, sizeof(MethodDefinition));
         if (!method_definitions) {
@@ -382,65 +401,97 @@ void collect_method_definitions(const char* file_path, const char* content, cons
         }
     }
 
-    const CompiledPatterns* patterns = compiledPatterns(grammar->type, LAYER_METHOD);
-    if (!patterns) {
-        logr(ERROR, "[Analyzer] No compiled patterns found for methods");
-        return;
-    }
-
-    logr(DEBUG, "[Analyzer] Searching for methods in file: %s", file_path);
+    // Add debug logging for content
+    const char* pos = content;
+    char preview[101] = {0};
+    strncpy(preview, pos, 100);
+    logr(DEBUG, "[Analyzer] Content preview for %s: '%.100s...'", file_path, preview);
     logr(DEBUG, "[Analyzer] Content length: %zu bytes", strlen(content));
 
-    for (size_t i = 0; i < patterns->pattern_count; i++) {
-        regex_t* regex = &patterns->compiled_patterns[i];
+    // Process each line to check for line endings
+    const char* line = content;
+    int line_count = 0;
+    while (*line) {
+        if (*line == '\n') line_count++;
+        line++;
+    }
+    logr(DEBUG, "[Analyzer] File has %d lines", line_count);
+
+    // Add line-by-line debug for first few lines
+    const char* line_start = content;
+    const char* line_end;
+    int line_num = 1;
+    for (int i = 0; i < 5 && *line_start; i++) {
+        line_end = strchr(line_start, '\n');
+        if (!line_end) break;
+        
+        size_t line_len = line_end - line_start;
+        char* line = malloc(line_len + 1);
+        strncpy(line, line_start, line_len);
+        line[line_len] = '\0';
+        
+        logr(DEBUG, "[Analyzer] Line %d: '%s'", line_num++, line);
+        free(line);
+        line_start = line_end + 1;
+    }
+
+    // Process each pattern
+    for (size_t i = 0; i < grammar->method_pattern_count; i++) {
+        regex_t regex;
+        logr(DEBUG, "[Analyzer] Trying pattern %zu: '%s'", i, grammar->method_patterns[i]);
+        
+        if (regcomp(&regex, grammar->method_patterns[i], REG_EXTENDED | REG_NEWLINE) != 0) {
+            logr(ERROR, "[Analyzer] Failed to compile pattern %zu", i);
+            continue;
+        }
+
         const char* pos = content;
         regmatch_t matches[5];
 
-        logr(DEBUG, "[Analyzer] Trying pattern %zu: %s", i, grammar->method_patterns[i]);
-
-        while (pos && *pos && regexec(regex, pos, 5, matches, 0) == 0) {
+        while (regexec(&regex, pos, 5, matches, 0) == 0) {
             // Extract the full match for debugging
-            int match_len = matches[0].rm_eo - matches[0].rm_so;
-            char* match_text = malloc(match_len + 1);
-            if (!match_text) continue;
-
-            strncpy(match_text, pos + matches[0].rm_so, match_len);
-            match_text[match_len] = '\0';
-
-            logr(DEBUG, "[Analyzer] Found match: '%s'", match_text);
-
-            // Determine the correct group for the method name
-            int name_group = 1;  // Adjust based on pattern index
-
+            size_t match_len = matches[0].rm_eo - matches[0].rm_so;
+            char* full_match = malloc(match_len + 1);
+            strncpy(full_match, pos + matches[0].rm_so, match_len);
+            full_match[match_len] = '\0';
+            
+            logr(DEBUG, "[Analyzer] Found potential match in %s: '%s'", file_path, full_match);
+            
+            // Extract method name (now in group 1 or 2 depending on pattern)
+            int name_group = (i == 2) ? 2 : 1;  // Adjust based on pattern
             if (matches[name_group].rm_so != -1) {
-                int name_len = matches[name_group].rm_eo - matches[name_group].rm_so;
+                size_t name_len = matches[name_group].rm_eo - matches[name_group].rm_so;
                 char* method_name = malloc(name_len + 1);
-                if (method_name) {
-                    strncpy(method_name, pos + matches[name_group].rm_so, name_len);
-                    method_name[name_len] = '\0';
-
-                    // Add to definitions if not already present
-                    bool found = false;
-                    for (size_t j = 0; j < method_def_count; j++) {
-                        if (method_definitions[j].name && 
-                            strcmp(method_definitions[j].name, method_name) == 0) {
-                            found = true;
-                            free(method_name);
-                            break;
-                        }
-                    }
-
-                    if (!found && method_def_count < MAX_METHOD_DEFS) {
-                        method_definitions[method_def_count].name = method_name;
-                        method_definitions[method_def_count].defined_in = strdup(file_path);
-                        method_def_count++;
-                        logr(INFO, "[Analyzer] Found method definition: %s in %s", method_name, file_path);
+                strncpy(method_name, pos + matches[name_group].rm_so, name_len);
+                method_name[name_len] = '\0';
+                
+                logr(DEBUG, "[Analyzer] Extracted method name: '%s'", method_name);
+                
+                // Add to definitions if not already present
+                bool found = false;
+                for (size_t j = 0; j < method_def_count; j++) {
+                    if (method_definitions[j].name && 
+                        strcmp(method_definitions[j].name, method_name) == 0) {
+                        found = true;
+                        break;
                     }
                 }
-            }
 
-            free(match_text);
+                if (!found && method_def_count < MAX_METHOD_DEFS) {
+                    method_definitions[method_def_count].name = strdup(method_name);
+                    method_definitions[method_def_count].defined_in = strdup(file_path);
+                    method_def_count++;
+                    logr(INFO, "[Analyzer] Added method: %s in %s", method_name, file_path);
+                }
+                free(method_name);
+            }
+            
+            free(full_match);
             pos += matches[0].rm_eo;
         }
+        regfree(&regex);
     }
+    
+    logr(INFO, "[Analyzer] Finished method collection for %s - found %zu methods", 
+         file_path, method_def_count);
 }

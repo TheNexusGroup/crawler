@@ -9,7 +9,7 @@
 PatternCache pattern_cache = {0};
 
 int initPatternCache(void) {
-    logr(DEBUG, "[PatternCache] Initializing pattern cache");
+    logr(VERBOSE, "[PatternCache] Initializing pattern cache");
     
     // Initialize all patterns to zero
     memset(&pattern_cache, 0, sizeof(PatternCache));
@@ -35,7 +35,7 @@ int initPatternCache(void) {
         for (size_t i = 0; i < grammar->module_pattern_count; i++) {
             if (regcomp(&pattern_cache.module_patterns[lang].compiled_patterns[i],
                        grammar->module_patterns[i], REG_EXTENDED) != 0) {
-                logr(ERROR, "[PatternCache] Failed to compile module pattern %zu for language %d", i, lang);
+                logr(WARN, "[PatternCache] Failed to compile module pattern %zu for language %d", i, lang);
                 return 0;
             }
         }
@@ -50,7 +50,7 @@ int initPatternCache(void) {
         
         pattern_cache.struct_patterns[lang].pattern_count = grammar->struct_pattern_count;
         for (size_t i = 0; i < grammar->struct_pattern_count; i++) {
-            logr(DEBUG, "[PatternCache] Compiling struct pattern %zu for language %d: %s", 
+            logr(VERBOSE, "[PatternCache] Compiling struct pattern %zu for language %d: %s", 
                  i, lang, grammar->struct_patterns[i]);
             if (regcomp(&pattern_cache.struct_patterns[lang].compiled_patterns[i],
                        grammar->struct_patterns[i], REG_EXTENDED) != 0) {
@@ -70,7 +70,7 @@ int initPatternCache(void) {
             
             pattern_cache.method_patterns[lang].pattern_count = grammar->method_pattern_count;
             for (size_t i = 0; i < grammar->method_pattern_count; i++) {
-                logr(DEBUG, "[PatternCache] Compiling method pattern %zu for language %d: %s", 
+                logr(VERBOSE, "[PatternCache] Compiling method pattern %zu for language %d: %s", 
                      i, lang, grammar->method_patterns[i]);
                 if (regcomp(&pattern_cache.method_patterns[lang].compiled_patterns[i],
                            grammar->method_patterns[i], REG_EXTENDED) != 0) {
