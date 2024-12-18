@@ -201,20 +201,34 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
         }
     }
 
+    // Analyze methods
     if (crawler->analysis_config.analyze_methods) {
-        Method* methods = analyze_method(content, grammar);
+        logr(DEBUG, "[Crawler] Analyzing methods for file: %s", filepath);
+        Method* methods = analyze_method(filepath, content, grammar);
+        
         if (methods) {
+            // Create a new dependency for methods
             ExtractedDependency* method_dep = malloc(sizeof(ExtractedDependency));
+            if (!method_dep) {
+                logr(ERROR, "[Crawler] Failed to allocate memory for method dependency");
+                return;
+            }
+            
             memset(method_dep, 0, sizeof(ExtractedDependency));
             method_dep->file_path = strdup(filepath);
             method_dep->methods = methods;
             method_dep->layer = LAYER_METHOD;
             
+            logr(DEBUG, "[Crawler] Adding methods to dependency graph from %s", filepath);
+            
             if (!crawler->dependency_graph) {
                 crawler->dependency_graph = create_dependency_from_extracted(method_dep);
+                logr(DEBUG, "[Crawler] Created new dependency graph with methods");
             } else {
                 add_to_dependency_graph(crawler->dependency_graph, method_dep);
+                logr(DEBUG, "[Crawler] Added methods to existing dependency graph");
             }
+            
             free_extracted_dependency(method_dep);
         }
     }
@@ -350,6 +364,34 @@ void crawl_dependencies(DependencyCrawler* crawler) {
     }
 }
 
+
+// In print_dependencies function
+static void print_method_tree(Method* method, int depth) {
+    while (method) {
+        // Print indentation
+        for (int i = 0; i < depth; i++) {
+            logr(INFO, "  ");
+        }
+
+        // Print method with proper tree characters
+        const char* prefix = method->next ? "├──" : "└──";
+        logr(INFO, "%s %s()", prefix, method->name);
+
+        // Print method details if available
+        if (method->dependencies) {
+            for (int i = 0; i < depth + 1; i++) logr(INFO, "  ");
+            logr(INFO, "├── calls: %s", method->dependencies);
+        }
+
+        // Recursively print children
+        if (method->children) {
+            print_method_tree(method->children, depth + 1);
+        }
+
+        method = method->next;
+    }
+}
+
 // Print dependency information
 void print_dependencies(DependencyCrawler* crawler) {
     if (!crawler->dependency_graph) {
@@ -399,11 +441,16 @@ void print_dependencies(DependencyCrawler* crawler) {
     
     for (size_t i = 0; i < def_count; i++) {
         StructureDefinition* def = &defs[i];
-        logr(INFO, "  %s (defined in %s)", def->name, def->defined_in);
+        logr(INFO, "  %s %s (defined in %s)", 
+            def->type,
+            def->name,
+            def->defined_in);
         if (def->reference_count > 0) {
             logr(INFO, "    Referenced in:");
             for (int j = 0; j < def->reference_count; j++) {
-                logr(INFO, "      └── %s", def->referenced_in[j]);
+                // Use ├── for all but the last reference, └── for the last one
+                const char* prefix = (j == def->reference_count - 1) ? "└──" : "├──";
+                logr(INFO, "      %s %s", prefix, def->referenced_in[j]);
             }
             struct_count++;
         }
@@ -420,14 +467,7 @@ void print_dependencies(DependencyCrawler* crawler) {
             method_count++;
             logr(INFO, "  %s", current->source);
             if (current->methods) {
-                Method* method = current->methods;
-                while (method) {
-                    logr(INFO, "    └── %s()", method->name);
-                    if (method->dependencies) {
-                        logr(INFO, "        └── calls: %s", method->dependencies);
-                    }
-                    method = method->next;
-                }
+                print_method_tree(current->methods, 1);
             }
         }
         current = current->next;

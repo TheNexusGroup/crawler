@@ -2,6 +2,7 @@
 #define SYNTAXES_H
 
 #include <regex.h>
+#include <stdbool.h>
 
 // Common constants
 #define MAX_PATTERN_LENGTH 256
@@ -78,11 +79,13 @@ typedef struct {
 typedef struct Method {
     char* name;
     char* return_type;
-    Parameter parameters[MAX_PARAMETERS];
+    Parameter* parameters;
     int param_count;
     char* dependencies;
-    int dependency_count;
-    Method* next;
+    struct Method* next;      // Sibling methods
+    struct Method* children;  // Child methods (e.g., class methods)
+    bool is_static;
+    bool is_public;
 } Method;
 
 typedef struct Structure {

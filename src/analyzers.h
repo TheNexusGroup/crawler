@@ -7,6 +7,7 @@
 // Structure definition tracking
 typedef struct {
     char* name;
+    char* type;
     char* defined_in;
     int reference_count;
     char** referenced_in;
@@ -16,14 +17,31 @@ typedef struct {
 extern StructureDefinition* structure_definitions;
 extern size_t structure_def_count;
 
+// Method definition tracking
+typedef struct {
+    char* name;
+    char* return_type;
+    char* defined_in;
+    int reference_count;
+    char** referenced_in;
+    size_t max_references;
+} MethodDefinition;
+
+extern MethodDefinition* method_definitions;
+extern size_t method_def_count;
+
 // Core analysis functions
 ExtractedDependency* analyze_module(const char* content, const LanguageGrammar* grammar);
 Structure* analyze_structure(const char* content, const char* file_path, const LanguageGrammar* grammar);
-Method* analyze_method(const char* content, const LanguageGrammar* grammar);
+Method* analyze_method(const char* file_path, const char* content, const LanguageGrammar* grammar);
 
 // Structure tracking functions
 void collect_structure_definitions(const char* file_path, const char* content, const LanguageGrammar* grammar);
 StructureDefinition* get_structure_definitions(size_t* count);
+
+// Method tracking functions
+void collect_method_definitions(const char* file_path, const char* content, const LanguageGrammar* grammar);
+MethodDefinition* get_method_definitions(size_t* count);
 
 // Dependency conversion helpers
 Dependency* create_dependency_from_extracted(ExtractedDependency* extracted);

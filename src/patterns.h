@@ -34,20 +34,22 @@ static const char* C_MODULE_PATTERNS[] = {
 };
 
 static const char* C_STRUCT_PATTERNS[] = {
-    "typedef\\s+struct\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{[^}]*\\}\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*;",  // typedef struct X { ... } Y;
-    "typedef\\s+struct\\s*\\{[^}]*\\}\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*;",  // typedef struct { ... } X;
-    "struct\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",  // struct X {
-    "typedef\\s+enum\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{[^}]*\\}\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*;",  // typedef enum X { ... } Y;
-    "enum\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",  // enum X {
-    "class\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",  // class X {
-    "union\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",  // union X {
-    "template\\s+<\\s*class\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*>",  // template <class X>
-    "template\\s+<\\s*typename\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*>",  // template <typename X>
+    "(typedef\\s+struct)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{[^}]*\\}\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*;",  // typedef struct X { ... } Y;
+    "(typedef\\s+struct)\\s*\\{[^}]*\\}\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*;",  // typedef struct { ... } X;
+    "(struct)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",  // struct X {
+    "(typedef\\s+enum)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{[^}]*\\}\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*;",  // typedef enum X { ... } Y;
+    "(enum)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",  // enum X {
+    "(class)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",  // class X {
+    "(union)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",  // union X {
+    "(template)\\s+<\\s*class\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*>",  // template <class X>
+    "(template)\\s+<\\s*typename\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*>",  // template <typename X>
 };
 
 static const char* C_METHOD_PATTERNS[] = {
-    "^\\s*([a-zA-Z0-9_]+)\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\)", // Function definitions
-    "^\\s*([a-zA-Z0-9_]+)::[a-zA-Z0-9_]+\\s*\\(.*\\)",          // C++ method calls
+    // Function definitions (with body) only
+    "^\\s*[a-zA-Z_][a-zA-Z0-9_]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{",
+    // Static function definitions
+    "^\\s*static\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{",
 };
 
 // JavaScript/TypeScript patterns

@@ -60,19 +60,23 @@ int initPatternCache(void) {
         }
         
         // Compile method patterns
-        pattern_cache.method_patterns[lang].compiled_patterns = 
-            malloc(grammar->method_pattern_count * sizeof(regex_t));
-        if (!pattern_cache.method_patterns[lang].compiled_patterns) {
-            logr(ERROR, "[PatternCache] Failed to allocate memory for method patterns");
-            return 0;
-        }
-        
-        pattern_cache.method_patterns[lang].pattern_count = grammar->method_pattern_count;
-        for (size_t i = 0; i < grammar->method_pattern_count; i++) {
-            if (regcomp(&pattern_cache.method_patterns[lang].compiled_patterns[i],
-                       grammar->method_patterns[i], REG_EXTENDED) != 0) {
-                logr(ERROR, "[PatternCache] Failed to compile method pattern %zu for language %d", i, lang);
+        if (grammar->method_patterns && grammar->method_pattern_count > 0) {
+            pattern_cache.method_patterns[lang].compiled_patterns = 
+                malloc(grammar->method_pattern_count * sizeof(regex_t));
+            if (!pattern_cache.method_patterns[lang].compiled_patterns) {
+                logr(ERROR, "[PatternCache] Failed to allocate memory for method patterns");
                 return 0;
+            }
+            
+            pattern_cache.method_patterns[lang].pattern_count = grammar->method_pattern_count;
+            for (size_t i = 0; i < grammar->method_pattern_count; i++) {
+                logr(DEBUG, "[PatternCache] Compiling method pattern %zu for language %d: %s", 
+                     i, lang, grammar->method_patterns[i]);
+                if (regcomp(&pattern_cache.method_patterns[lang].compiled_patterns[i],
+                           grammar->method_patterns[i], REG_EXTENDED) != 0) {
+                    logr(ERROR, "[PatternCache] Failed to compile method pattern %zu for language %d", i, lang);
+                    return 0;
+                }
             }
         }
     }
@@ -106,10 +110,12 @@ void cleanPatternCache(void) {
         free(pattern_cache.struct_patterns[lang].compiled_patterns);
 
         // Free method patterns
-        for (size_t i = 0; i < pattern_cache.method_patterns[lang].pattern_count; i++) {
-            regfree(&pattern_cache.method_patterns[lang].compiled_patterns[i]);
+        if (pattern_cache.method_patterns[lang].pattern_count > 0) {
+            for (size_t i = 0; i < pattern_cache.method_patterns[lang].pattern_count; i++) {
+                regfree(&pattern_cache.method_patterns[lang].compiled_patterns[i]);
+            }
+            free(pattern_cache.method_patterns[lang].compiled_patterns);
         }
-        free(pattern_cache.method_patterns[lang].compiled_patterns);
     }
 
     pattern_cache.initialized = 0;
