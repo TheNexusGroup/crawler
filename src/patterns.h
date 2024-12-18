@@ -34,13 +34,15 @@ static const char* C_MODULE_PATTERNS[] = {
 };
 
 static const char* C_STRUCT_PATTERNS[] = {
-    "^\\s*typedef\\s+struct\\s+([a-zA-Z0-9_]+)",  // Typedef struct
-    "^\\s*struct\\s+([a-zA-Z0-9_]+)",            // Regular struct
-    "^\\s*class\\s+([a-zA-Z0-9_]+)(\\s*:\\s*[^{]+)?", // C++ class with inheritance
-    "^\\s*typedef\\s+enum\\s+([a-zA-Z0-9_]+)",   // Typedef enum
-    "^\\s*enum\\s+([a-zA-Z0-9_]+)",              // Regular enum
-    "^\\s*([a-zA-Z0-9_]+)\\s+([a-zA-Z0-9_]+);",  // Member variable declarations
-    "^\\s*template\\s*<[^>]+>\\s*class\\s+([a-zA-Z0-9_]+)"  // Template class
+    "typedef\\s+struct\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{[^}]*\\}\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*;",  // typedef struct X { ... } Y;
+    "typedef\\s+struct\\s*\\{[^}]*\\}\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*;",  // typedef struct { ... } X;
+    "struct\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",  // struct X {
+    "typedef\\s+enum\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{[^}]*\\}\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*;",  // typedef enum X { ... } Y;
+    "enum\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",  // enum X {
+    "class\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",  // class X {
+    "union\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",  // union X {
+    "template\\s+<\\s*class\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*>",  // template <class X>
+    "template\\s+<\\s*typename\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*>",  // template <typename X>
 };
 
 static const char* C_METHOD_PATTERNS[] = {

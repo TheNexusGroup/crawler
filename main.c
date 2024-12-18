@@ -164,7 +164,7 @@ int main(int argc, char* argv[]) {
     // Export results
     printf("Exporting results...\n");
     if (options.verbose) {
-        print_dependencies(crawler, 1);
+        print_dependencies(crawler);
     } else {
         export_dependencies(crawler, options.output_format);
     }

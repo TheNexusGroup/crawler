@@ -31,7 +31,7 @@ DependencyCrawler* create_crawler(char** dirs, int dir_count, AnalysisConfig* co
 void register_language_parser(DependencyCrawler* crawler, LanguageType type, 
                             const LanguageParser* parser);
 void crawl_dependencies(DependencyCrawler* crawler);
-void print_dependencies(DependencyCrawler* crawler, int verbosity);
+void print_dependencies(DependencyCrawler* crawler);
 void export_dependencies(DependencyCrawler* crawler, const char* output_format);
 void free_crawler(DependencyCrawler* crawler);
 

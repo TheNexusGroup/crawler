@@ -7,17 +7,6 @@
 #include <sys/stat.h>
 #include "logger.h"
 
-// Initialize pattern cache at startup
-static void init_crawler_patterns(void) {
-    logr(DEBUG, "[Crawler] Initializing crawler patterns");
-    if (initPatternCache() != 0) {
-        logr(ERROR, "[Crawler] Failed to initialize pattern cache");
-        exit(1);
-    }
-    logr(DEBUG, "[Crawler] Pattern cache initialized successfully");
-}
-
-// Create a new crawler instance with analysis configuration
 DependencyCrawler* create_crawler(char** directories, int directory_count, AnalysisConfig* config) {
     logr(INFO, "[Crawler] Creating new crawler instance with %d directories", directory_count);
     
@@ -142,8 +131,8 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
     }
 
     if (crawler->analysis_config.analyze_structures) {
-        logr(DEBUG, "[Crawler] Analyzing structures for file: %s", filepath);
-        Structure* structs = analyze_structure(content, grammar);
+        logr(DEBUG, "[Crawler] Analyzing structures in %s", filepath);
+        Structure* structs = analyze_structure(content, filepath, grammar);
         if (structs) {
             logr(DEBUG, "[Crawler] Found structure dependencies");
             ExtractedDependency* struct_dep = malloc(sizeof(ExtractedDependency));
@@ -362,7 +351,7 @@ void crawl_dependencies(DependencyCrawler* crawler) {
 }
 
 // Print dependency information
-void print_dependencies(DependencyCrawler* crawler, int verbosity) {
+void print_dependencies(DependencyCrawler* crawler) {
     if (!crawler->dependency_graph) {
         logr(INFO, "[Crawler] No dependencies found.");
         return;
@@ -394,6 +383,7 @@ void print_dependencies(DependencyCrawler* crawler, int verbosity) {
         // Use └── for last item, ├── for others
         const char* prefix = next_with_same_source ? "├──" : "└──";
         logr(INFO, "    %s %s", prefix, dep->target);
+        module_count++;
         
         dep = dep->next;
     }
@@ -403,27 +393,22 @@ void print_dependencies(DependencyCrawler* crawler, int verbosity) {
     // Structure Dependencies
     logr(INFO, "Structure Dependencies:");
     logr(INFO, "--------------------");
-    current = crawler->dependency_graph;
-    int struct_count = 0;
-    while (current) {
-        if (current->level == LAYER_STRUCT) {
+    size_t def_count;
+    size_t struct_count = 0;
+    StructureDefinition* defs = get_structure_definitions(&def_count);
+    
+    for (size_t i = 0; i < def_count; i++) {
+        StructureDefinition* def = &defs[i];
+        logr(INFO, "  %s (defined in %s)", def->name, def->defined_in);
+        if (def->reference_count > 0) {
+            logr(INFO, "    Referenced in:");
+            for (int j = 0; j < def->reference_count; j++) {
+                logr(INFO, "      └── %s", def->referenced_in[j]);
+            }
             struct_count++;
-            logr(INFO, "  %s", current->source);
-            if (current->target) {
-                logr(INFO, "    └── %s", current->target);
-            }
-            // Print associated methods if verbosity > 1
-            if (verbosity > 1 && current->methods) {
-                Method* method = current->methods;
-                while (method) {
-                    logr(INFO, "        └── %s()", method->name);
-                    method = method->next;
-                }
-            }
         }
-        current = current->next;
     }
-    logr(INFO, "Total Structure Dependencies: %d\n", struct_count);
+    logr(INFO, "Total Structure Dependencies: %zu\n", struct_count);
 
     // Method Dependencies
     logr(INFO, "Method Dependencies:");
@@ -449,7 +434,7 @@ void print_dependencies(DependencyCrawler* crawler, int verbosity) {
     }
     logr(INFO, "Total Method Dependencies: %d\n", method_count);
 
-    logr(INFO, "\nTotal Dependencies: %d", module_count + struct_count + method_count);
+    logr(INFO, "\nTotal Dependencies: %zu", module_count + struct_count + method_count);
 }
 
 // Export dependencies in various formats
@@ -461,7 +446,7 @@ void export_dependencies(DependencyCrawler* crawler, const char* output_format) 
         // TODO: Implement GraphViz export
         logr(INFO, "[Crawler] GraphViz export not yet implemented");
     } else {
-        print_dependencies(crawler, 0);  // Default to terminal output
+        print_dependencies(crawler);  // Default to terminal output
     }
 }
 

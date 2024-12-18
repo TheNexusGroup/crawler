@@ -68,31 +68,22 @@ ExtractedDependency* analyze_file(const char* file_path, AnalysisConfig* config)
 
     // Create dependency structure
     ExtractedDependency* dep = malloc(sizeof(ExtractedDependency));
-    memset(dep, 0, sizeof(ExtractedDependency));
+    if (!dep) {
+        free(content);
+        return NULL;
+    }
+    
+    // Initialize dependency
     dep->file_path = strdup(file_path);
-
-    // Get the grammar for this language
-    LanguageType lang = languageType(file_path);
-    const LanguageGrammar* grammar = languageGrammars(lang);
-
-    // Analyze each layer according to config
-    if (config->analyze_modules) {
-        dep->modules = analyze_module(content, grammar);
-        dep->layer = LAYER_MODULE;
-    }
-    if (config->analyze_structures) {
-        // Analyze structures in the file
-        dep->structures = analyze_structure(content, grammar);
-        if (dep->structures) {
-            dep->structure_count = 1; // Update based on actual count
-        }
-    }
-    if (config->analyze_methods) {
-        // Analyze methods not associated with structures
+    dep->language = languageType(file_path);
+    
+    // Get grammar
+    const LanguageGrammar* grammar = languageGrammars(dep->language);
+    if (grammar) {
+        // Update this line to include file_path
+        dep->structures = analyze_structure(content, file_path, grammar);
         dep->methods = analyze_method(content, grammar);
-        if (dep->methods) {
-            dep->method_count = 1; // Update based on actual count
-        }
+        dep->modules = analyze_module(content, grammar);
     }
 
     free(content);
