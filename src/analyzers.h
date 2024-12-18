@@ -25,20 +25,6 @@ typedef struct ScopeContext {
     int brace_depth;    
 } ScopeContext;
 
-// Add this structure to track method references
-typedef struct MethodReference {
-    char* called_in;
-    struct MethodReference* next;
-} MethodReference;
-
-// Method definition tracking
-typedef struct MethodDefinition {
-    char* name;
-    char* defined_in;
-    MethodReference* references;  // Change from referenced_in array
-    int reference_count;
-    int max_references;  // Keep this if still needed
-} MethodDefinition;
 
 extern MethodDefinition* method_definitions;
 extern size_t method_def_count;

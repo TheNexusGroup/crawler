@@ -457,6 +457,14 @@ void collect_method_definitions(const char* file_path, const char* content, cons
             logr(ERROR, "[Analyzer] Failed to allocate method definitions array");
             return;
         }
+        // Initialize all fields to NULL/0
+        for (size_t i = 0; i < MAX_METHOD_DEFS; i++) {
+            method_definitions[i].name = NULL;
+            method_definitions[i].defined_in = NULL;
+            method_definitions[i].dependencies = NULL;
+            method_definitions[i].references = NULL;
+            method_definitions[i].reference_count = 0;
+        }
     }
 
     const CompiledPatterns* patterns = compiledPatterns(grammar->type, LAYER_METHOD);
@@ -528,6 +536,7 @@ void free_method_definitions() {
     for (size_t i = 0; i < method_def_count; i++) {
         free(method_definitions[i].name);
         free(method_definitions[i].defined_in);
+        free(method_definitions[i].dependencies);
         free_method_references(method_definitions[i].references);
     }
     free(method_definitions);
@@ -581,7 +590,10 @@ static void analyze_method_calls(const char* body, MethodDefinition* def) {
     for (size_t i = 0; i < method_def_count; i++) {
         if (!method_definitions[i].name) continue;
 
-        // Create pattern to look for method name
+        // Skip self-references
+        if (strcmp(method_definitions[i].name, def->name) == 0) continue;
+
+        // Create pattern to look for method name with word boundaries
         char pattern[256];
         snprintf(pattern, sizeof(pattern), "\\b%s\\s*\\(", method_definitions[i].name);
         
@@ -590,6 +602,23 @@ static void analyze_method_calls(const char* body, MethodDefinition* def) {
             if (regexec(&regex, body, 0, NULL, 0) == 0) {
                 // Found a call to this method
                 add_method_reference(&method_definitions[i], def->defined_in);
+
+                // Add to dependencies list
+                if (!def->dependencies) {
+                    def->dependencies = strdup(method_definitions[i].name);
+                } else {
+                    // Check if dependency already exists
+                    char* found = strstr(def->dependencies, method_definitions[i].name);
+                    if (!found || (found > def->dependencies && found[-1] != ' ') || 
+                        (found[strlen(method_definitions[i].name)] != '\0' && 
+                         found[strlen(method_definitions[i].name)] != ',')) {
+                        char* new_deps = malloc(strlen(def->dependencies) + 
+                                              strlen(method_definitions[i].name) + 3);
+                        sprintf(new_deps, "%s, %s", def->dependencies, method_definitions[i].name);
+                        free(def->dependencies);
+                        def->dependencies = new_deps;
+                    }
+                }
             }
             regfree(&regex);
         }

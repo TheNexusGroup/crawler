@@ -176,5 +176,20 @@ void free_structures(Structure* structs);
 extern void free_methods(Method* methods);
 void free_dependency(ExtractedDependency* dep);
 
+// Add this before the MethodDefinition struct (around line 180)
+typedef struct MethodReference {
+    char* called_in;
+    struct MethodReference* next;
+} MethodReference;
+
+// Then the existing MethodDefinition struct
+typedef struct MethodDefinition {
+    char* name;
+    char* defined_in;
+    char* dependencies;
+    MethodReference* references;
+    int reference_count;
+} MethodDefinition;
+
 
 #endif // SYNTAXES_H

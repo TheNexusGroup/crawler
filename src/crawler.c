@@ -332,65 +332,40 @@ void crawl_dependencies(DependencyCrawler* crawler) {
 static void print_method_tree(Method* method, const char* source_file) {
     if (!method || !source_file) return;
     
-    // Track printed methods to avoid duplicates
-    char** printed = NULL;
-    size_t printed_count = 0;
-    
     while (method) {
-        if (!method->name) {
-            method = method->next;
-            continue;
-        }
-
-        // Check if we've already printed this method
-        bool already_printed = false;
-        for (size_t i = 0; i < printed_count; i++) {
-            if (strcmp(printed[i], method->name) == 0) {
-                already_printed = true;
-                break;
-            }
-        }
-
-        if (!already_printed) {
-            // Add to printed list
-            printed = realloc(printed, (printed_count + 1) * sizeof(char*));
-            printed[printed_count++] = strdup(method->name);
-
-            // Print method name
+        if (method->name) {
             logr(INFO, "  ├── %s", method->name);
-
-            // Print where this method is called from
-            MethodReference* ref = method->references;
-            while (ref) {
-                if (ref->called_in && strcmp(ref->called_in, source_file) != 0) {
-                    logr(INFO, "  │   ├── called from %s", ref->called_in);
-                }
-                ref = ref->next;
-            }
-
-            // Print what this method calls
+            
+            // Print calls
             if (method->dependencies) {
+                logr(INFO, "  │   ├── calls:");
                 char* deps = strdup(method->dependencies);
                 char* saveptr;
                 char* token = strtok_r(deps, ",", &saveptr);
                 while (token) {
                     while (*token && isspace(*token)) token++;
                     if (*token) {
-                        logr(INFO, "  │   ├── calls %s", token);
+                        logr(INFO, "  │   │   ├── %s", token);
                     }
                     token = strtok_r(NULL, ",", &saveptr);
                 }
                 free(deps);
             }
+
+            // Print called from
+            MethodReference* ref = method->references;
+            if (ref) {
+                logr(INFO, "  │   ├── called by:");
+                while (ref) {
+                    if (ref->called_in && strcmp(ref->called_in, source_file) != 0) {
+                        logr(INFO, "  │   │   ├── %s", ref->called_in);
+                    }
+                    ref = ref->next;
+                }
+            }
         }
         method = method->next;
     }
-
-    // Cleanup
-    for (size_t i = 0; i < printed_count; i++) {
-        free(printed[i]);
-    }
-    free(printed);
 }
 
 // Print dependency information
