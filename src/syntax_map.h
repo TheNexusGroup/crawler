@@ -8,6 +8,6 @@
 extern const size_t LANGUAGE_GRAMMAR_COUNT;
 
 // Helper function to free dependency
-void free_dependency(ExtractedDependency* dep);
+void freeDependency(ExtractedDependency* dep);
 
 #endif // SYNTAX_MAP_H

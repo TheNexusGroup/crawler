@@ -171,10 +171,10 @@ typedef struct {
 
 // Function prototypes for graph generation
 DependencyGraph* create_dependency_graph(ExtractedDependency** deps, int dep_count);
-void export_graph(DependencyGraph* graph, const char* format, const char* output_path);
-void free_structures(Structure* structs);
-extern void free_methods(Method* methods);
-void free_dependency(ExtractedDependency* dep);
+void exportGraph(DependencyGraph* graph, const char* format, const char* output_path);
+void freeStructures(Structure* structs);
+extern void freeMethods(Method* methods);
+void freeDependency(ExtractedDependency* dep);
 
 // Add this before the MethodDefinition struct (around line 180)
 typedef struct MethodReference {

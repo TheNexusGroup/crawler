@@ -8,7 +8,7 @@
 #include <ctype.h>
 
 // Helper function declarations
-static void add_method_reference(MethodDefinition* def, const char* file_path);
+static void addMethodRef(MethodDefinition* def, const char* file_path);
 
 #define MAX_STRUCTURE_DEFS 1024
 StructureDefinition* structure_definitions = NULL;
@@ -25,7 +25,7 @@ StructureDefinition* get_structure_definitions(size_t* count) {
 }
 
 // New function to collect structure definitions
-void collect_structure_definitions(const char* file_path, const char* content, const LanguageGrammar* grammar) {
+void collectStructures(const char* file_path, const char* content, const LanguageGrammar* grammar) {
     if (!structure_definitions) {
         structure_definitions = calloc(MAX_STRUCTURE_DEFS, sizeof(StructureDefinition));
         if (!structure_definitions) return;
@@ -102,7 +102,7 @@ Structure* analyze_structure(const char* content, const char* file_path, const L
     }
 
     // First collect structure definitions if not already done
-    collect_structure_definitions(file_path, content, grammar);
+    collectStructures(file_path, content, grammar);
 
     // Now scan for references to known structures
     for (size_t i = 0; i < structure_def_count; i++) {
@@ -191,7 +191,7 @@ Parameter* parse_parameters(const char* params_str) {
 }
 
 // Helper function to check if we're within a valid scope
-static bool is_within_scope(const char* content, size_t position, ScopeContext* context) {
+static bool withinScope(const char* content, size_t position, ScopeContext* context) {
     (void)context; // Explicitly mark as unused
     
     // Count braces from start of scope definition to current position
@@ -263,7 +263,7 @@ Method* analyze_method(const char* file_path, const char* content, const Languag
     Method* current = NULL;
 
     // First collect method definitions
-    collect_method_definitions(file_path, content, grammar);
+    collectDefinitions(file_path, content, grammar);
 
     // Convert method_definitions to Method list
     for (size_t i = 0; i < method_def_count; i++) {
@@ -304,7 +304,7 @@ Method* analyze_method(const char* file_path, const char* content, const Languag
 }
 
 // Add this cleanup function
-void free_method(Method* method) {
+void freeMethod(Method* method) {
     if (!method) return;
     
     free(method->name);
@@ -330,7 +330,7 @@ void free_method(Method* method) {
     }
     
     // Free children methods
-    free_methods(method->children);
+    freeMethods(method->children);
 }
 
 // Helper function to convert ExtractedDependency to Dependency
@@ -360,7 +360,7 @@ Dependency* create_dependency_from_extracted(ExtractedDependency* extracted) {
 }
 
 // Helper function to add to existing dependency graph
-void add_to_dependency_graph(Dependency* graph, ExtractedDependency* extracted) {
+void graphDependency(Dependency* graph, ExtractedDependency* extracted) {
     Dependency* new_dep = create_dependency_from_extracted(extracted);
     Dependency* curr = graph;
     while (curr->next) {
@@ -369,7 +369,7 @@ void add_to_dependency_graph(Dependency* graph, ExtractedDependency* extracted) 
     curr->next = new_dep;
 }
 
-void free_extracted_dependency(ExtractedDependency* dep) {
+void freeExtractedDep(ExtractedDependency* dep) {
     if (!dep) return;
 
     free(dep->file_path);
@@ -379,18 +379,18 @@ void free_extracted_dependency(ExtractedDependency* dep) {
     ExtractedDependency* curr_mod = dep->modules;
     while (curr_mod) {
         ExtractedDependency* next = curr_mod->next;
-        free_extracted_dependency(curr_mod);
+        freeExtractedDep(curr_mod);
         curr_mod = next;
     }
 
     // Free structures
     if (dep->structures) {
-        free_structures(dep->structures);
+        freeStructures(dep->structures);
     }
 
     // Free methods
     if (dep->methods) {
-        free_methods(dep->methods);
+        freeMethods(dep->methods);
     }
 
     free(dep);
@@ -456,7 +456,7 @@ ExtractedDependency* analyze_module(const char* content, const LanguageGrammar* 
     return head;
 }
 
-static bool is_method_definition(const char* method_start, size_t len) {
+static bool methodDefinition(const char* method_start, size_t len) {
     // Look for opening brace after the method declaration
     const char* pos = method_start;
     const char* end = method_start + len;
@@ -473,7 +473,7 @@ static bool is_method_definition(const char* method_start, size_t len) {
     return (pos < end && *pos == '{');
 }
 
-static void add_method_definition(const char* method_name, const char* file_path) {
+static void addMethod(const char* method_name, const char* file_path) {
     if (method_def_count >= MAX_METHOD_DEFS || !method_name || !file_path) return;
     
     // Skip empty method names
@@ -492,7 +492,7 @@ static void add_method_definition(const char* method_name, const char* file_path
     method_def_count++;
 }
 
-static bool found_existing_definition(const char* method_name) {
+static bool definitionFound(const char* method_name) {
     for (size_t i = 0; i < method_def_count; i++) {
         if (strcmp(method_definitions[i].name, method_name) == 0) {
             return true;
@@ -501,7 +501,7 @@ static bool found_existing_definition(const char* method_name) {
     return false;
 }
 
-void collect_method_definitions(const char* file_path, const char* content, const LanguageGrammar* grammar) {
+void collectDefinitions(const char* file_path, const char* content, const LanguageGrammar* grammar) {
     if (!method_definitions) {
         method_definitions = calloc(MAX_METHOD_DEFS, sizeof(MethodDefinition));
         if (!method_definitions) return;
@@ -516,7 +516,7 @@ void collect_method_definitions(const char* file_path, const char* content, cons
         regmatch_t matches[4];  // We need up to 4 groups
 
         while (regexec(regex, pos, 4, matches, 0) == 0) {
-            if (is_method_definition(pos + matches[0].rm_so, 
+            if (methodDefinition(pos + matches[0].rm_so, 
                                    matches[0].rm_eo - matches[0].rm_so)) {
                 
                 // Extract method name using the language-specific group
@@ -531,8 +531,8 @@ void collect_method_definitions(const char* file_path, const char* content, cons
                         name_len);
                 method_name[name_len] = '\0';
 
-                if (!found_existing_definition(method_name)) {
-                    add_method_definition(method_name, file_path);
+                if (!definitionFound(method_name)) {
+                    addMethod(method_name, file_path);
                 }
                 free(method_name);
             }
@@ -541,7 +541,7 @@ void collect_method_definitions(const char* file_path, const char* content, cons
     }
 }
 
-void free_method_references(MethodReference* refs) {
+void freeMethod_references(MethodReference* refs) {
     while (refs) {
         MethodReference* next = refs->next;
         free(refs->called_in);
@@ -551,21 +551,21 @@ void free_method_references(MethodReference* refs) {
 }
 
 // Update the existing cleanup code to use this
-void free_method_definitions() {
+void freeMethod_definitions() {
     for (size_t i = 0; i < method_def_count; i++) {
         free(method_definitions[i].name);
         free(method_definitions[i].defined_in);
         free(method_definitions[i].dependencies);
-        free_method_references(method_definitions[i].references);
+        freeMethod_references(method_definitions[i].references);
     }
     free(method_definitions);
     method_definitions = NULL;
     method_def_count = 0;
 }
 
-// Add these implementations before collect_method_definitions
+// Add these implementations before collectDefinitions
 
-static void add_method_reference(MethodDefinition* def, const char* file_path) {
+static void addMethodRef(MethodDefinition* def, const char* file_path) {
     if (!def || !file_path) return;
 
     // Check if we already have this reference

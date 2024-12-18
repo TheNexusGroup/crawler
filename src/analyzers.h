@@ -35,20 +35,20 @@ Structure* analyze_structure(const char* content, const char* file_path, const L
 Method* analyze_method(const char* file_path, const char* content, const LanguageGrammar* grammar);
 
 // Structure tracking functions
-void collect_structure_definitions(const char* file_path, const char* content, const LanguageGrammar* grammar);
+void collectStructures(const char* file_path, const char* content, const LanguageGrammar* grammar);
 StructureDefinition* get_structure_definitions(size_t* count);
 
 // Method tracking functions
-void collect_method_definitions(const char* file_path, const char* content, const LanguageGrammar* grammar);
+void collectDefinitions(const char* file_path, const char* content, const LanguageGrammar* grammar);
 MethodDefinition* get_method_definitions(size_t* count);
 
 // Dependency conversion helpers
 Dependency* create_dependency_from_extracted(ExtractedDependency* extracted);
-void add_to_dependency_graph(Dependency* graph, ExtractedDependency* extracted);
-void free_extracted_dependency(ExtractedDependency* dep);
+void graphDependency(Dependency* graph, ExtractedDependency* extracted);
+void freeExtractedDep(ExtractedDependency* dep);
 
 // Add these if they're not already present
-void free_method_references(MethodReference* refs);
-void free_method_definitions(void);
+void freeMethod_references(MethodReference* refs);
+void freeMethod_definitions(void);
 
 #endif // ANALYZERS_H

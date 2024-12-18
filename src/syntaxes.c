@@ -150,7 +150,7 @@ DependencyGraph* create_dependency_graph(ExtractedDependency** deps, int dep_cou
 }
 
 // Export the dependency graph to a specific format
-void export_graph(DependencyGraph* graph, const char* format, const char* output_path) {
+void exportGraph(DependencyGraph* graph, const char* format, const char* output_path) {
     if (!graph || !format || !output_path) return;
 
     FILE* output = fopen(output_path, "w");
@@ -198,7 +198,7 @@ const char* languageName(LanguageType type) {
     }
 }
 
-void free_structures(Structure* structs) {
+void freeStructures(Structure* structs) {
     while (structs) {
         Structure* next = structs->next;
         
@@ -240,7 +240,7 @@ void free_structures(Structure* structs) {
     }
 }
 
-void free_methods(Method* methods) {
+void freeMethods(Method* methods) {
     while (methods) {
         Method* next = methods->next;
         

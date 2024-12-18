@@ -9,13 +9,13 @@
 #include <ctype.h>
 
 // Add these after includes
-static void process_file(DependencyCrawler* crawler, const char* file_path);
-static void crawl_directory(DependencyCrawler* crawler, const char* dir_path);
+static void processFile(DependencyCrawler* crawler, const char* file_path);
+static void crawlDir(DependencyCrawler* crawler, const char* dir_path);
 static void processLayer(DependencyCrawler* crawler, const char* filepath, 
                         const char* content, const LanguageGrammar* grammar);
-static void add_methods_to_graph(DependencyCrawler* crawler, const char* file_path, 
+static void graphMethods(DependencyCrawler* crawler, const char* file_path, 
                                 Method* methods);
-static void print_method_tree(Method* method, const char* source_file);
+static void printMethods(Method* method, const char* source_file);
 
 DependencyCrawler* create_crawler(char** directories, int directory_count, AnalysisConfig* config) {
     logr(INFO, "[Crawler] Creating new crawler instance with %d directories", directory_count);
@@ -57,13 +57,13 @@ DependencyCrawler* create_crawler(char** directories, int directory_count, Analy
     for (int i = 0; i < directory_count; i++) {
         if (!directories[i]) {
             logr(ERROR, "[Crawler] NULL directory at index %d", i);
-            free_crawler(crawler);
+            freeCrawler(crawler);
             return NULL;
         }
         crawler->root_directories[i] = strdup(directories[i]);
         if (!crawler->root_directories[i]) {
             logr(ERROR, "[Crawler] Failed to duplicate directory path at index %d", i);
-            free_crawler(crawler);
+            freeCrawler(crawler);
             return NULL;
         }
         logr(VERBOSE, "[Crawler] Added directory: %s", crawler->root_directories[i]);
@@ -79,7 +79,7 @@ DependencyCrawler* create_crawler(char** directories, int directory_count, Analy
 }
 
 // Register a language-specific parser
-void register_language_parser(DependencyCrawler* crawler, LanguageType type,
+void registerParser(DependencyCrawler* crawler, LanguageType type,
                             const LanguageParser* parser) {
     logr(VERBOSE, "[Crawler] Registering parser for language %s", languageName(type));
     crawler->parser_count++;
@@ -115,7 +115,7 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
             ExtractedDependency* temp_dep = malloc(sizeof(ExtractedDependency));
             if (!temp_dep) {
                 logr(ERROR, "[Crawler] Failed to allocate memory for temporary dependency");
-                free_extracted_dependency(deps);
+                freeExtractedDep(deps);
                 return;
             }
             memset(temp_dep, 0, sizeof(ExtractedDependency));
@@ -130,14 +130,14 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
                 crawler->dependency_graph = create_dependency_from_extracted(temp_dep);
                 logr(VERBOSE, "[Crawler] Created new dependency graph");
             } else {
-                add_to_dependency_graph(crawler->dependency_graph, temp_dep);
+                graphDependency(crawler->dependency_graph, temp_dep);
                 logr(VERBOSE, "[Crawler] Added to existing dependency graph");
             }
             
-            free_extracted_dependency(temp_dep);
+            freeExtractedDep(temp_dep);
             current_dep = current_dep->next;
         }
-        free_extracted_dependency(deps);
+        freeExtractedDep(deps);
     }
 
     if (crawler->analysis_config.analyze_structures) {
@@ -148,7 +148,7 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
             ExtractedDependency* struct_dep = malloc(sizeof(ExtractedDependency));
             if (!struct_dep) {
                 logr(ERROR, "[Crawler] Failed to allocate memory for structure dependency");
-                free_structures(structs);
+                freeStructures(structs);
                 return;
             }
             memset(struct_dep, 0, sizeof(ExtractedDependency));
@@ -194,7 +194,7 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
                     }
                     curr_dep = curr_dep->next;
                 }
-                free_extracted_dependency(type_deps);
+                freeExtractedDep(type_deps);
                 curr_struct = curr_struct->next;
             }
             
@@ -203,11 +203,11 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
                 crawler->dependency_graph = create_dependency_from_extracted(struct_dep);
                 logr(VERBOSE, "[Crawler] Created new dependency graph for structures");
             } else {
-                add_to_dependency_graph(crawler->dependency_graph, struct_dep);
+                graphDependency(crawler->dependency_graph, struct_dep);
                 logr(VERBOSE, "[Crawler] Added structures to existing dependency graph");
             }
             
-            free_extracted_dependency(struct_dep);
+            freeExtractedDep(struct_dep);
         }
     }
 
@@ -217,7 +217,7 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
         Method* methods = analyze_method(filepath, content, grammar);
         
         if (methods) {
-            add_methods_to_graph(crawler, filepath, methods);
+            graphMethods(crawler, filepath, methods);
         }
     }
     
@@ -225,7 +225,7 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
 }
 
 // Process a single file
-static void process_file(DependencyCrawler* crawler, const char* file_path) {
+static void processFile(DependencyCrawler* crawler, const char* file_path) {
     if (!crawler || !file_path) return;
     
     logr(DEBUG, "[Crawler] Processing file: %s", file_path);
@@ -269,9 +269,9 @@ static void process_file(DependencyCrawler* crawler, const char* file_path) {
 }
 
 // Recursively crawl directories
-static void crawl_directory(DependencyCrawler* crawler, const char* dir_path) {
+static void crawlDir(DependencyCrawler* crawler, const char* dir_path) {
     if (!crawler || !dir_path) {
-        logr(ERROR, "[Crawler] Invalid parameters in crawl_directory");
+        logr(ERROR, "[Crawler] Invalid parameters in crawlDir");
         return;
     }
 
@@ -298,10 +298,10 @@ static void crawl_directory(DependencyCrawler* crawler, const char* dir_path) {
         
         if (S_ISDIR(statbuf.st_mode)) {
             logr(VERBOSE, "[Crawler] Found directory: %s", path);
-            crawl_directory(crawler, path);
+            crawlDir(crawler, path);
         } else {
             logr(VERBOSE, "[Crawler] Found file: %s", path);
-            process_file(crawler, path);
+            processFile(crawler, path);
         }
     }
     
@@ -310,7 +310,7 @@ static void crawl_directory(DependencyCrawler* crawler, const char* dir_path) {
 }
 
 // Main crawling function
-void crawl_dependencies(DependencyCrawler* crawler) {
+void crawlDeps(DependencyCrawler* crawler) {
     logr(INFO, "[Crawler] Starting dependency crawl for %d directories", crawler->directory_count);
     if (!crawler || !crawler->root_directories) {
         logr(ERROR, "[Crawler] Invalid crawler instance");
@@ -323,13 +323,13 @@ void crawl_dependencies(DependencyCrawler* crawler) {
             continue;
         }
         logr(DEBUG, "[Crawler] Processing directory %d: %s", i, crawler->root_directories[i]);
-        crawl_directory(crawler, crawler->root_directories[i]);
+        crawlDir(crawler, crawler->root_directories[i]);
     }
 }
 
 
-// In print_dependencies function
-static void print_method_tree(Method* method, const char* source_file) {
+// In printDependencies function
+static void printMethods(Method* method, const char* source_file) {
     while (method) {
         bool is_last_method = (method->next == NULL);
         const char* method_prefix = is_last_method ? "└──" : "├──";
@@ -410,7 +410,7 @@ static void print_method_tree(Method* method, const char* source_file) {
 }
 
 // Print dependency information
-void print_dependencies(DependencyCrawler* crawler) {
+void printDependencies(DependencyCrawler* crawler) {
     if (!crawler->dependency_graph) {
         logr(INFO, "[Crawler] No dependencies found.");
         return;
@@ -517,7 +517,7 @@ void print_dependencies(DependencyCrawler* crawler) {
             while (current) {
                 if (current->level == LAYER_METHOD && current->source && 
                     strcmp(current->source, processed_files[i]) == 0) {
-                    print_method_tree(current->methods, current->source);
+                    printMethods(current->methods, current->source);
                     method_count++;
                 }
                 current = current->next;
@@ -533,7 +533,7 @@ void print_dependencies(DependencyCrawler* crawler) {
 }
 
 // Export dependencies in various formats
-void export_dependencies(DependencyCrawler* crawler, const char* output_format) {
+void exportDeps(DependencyCrawler* crawler, const char* output_format) {
     if (strcmp(output_format, "json") == 0) {
         // TODO: Implement JSON export
         logr(INFO, "[Crawler] JSON export not yet implemented");
@@ -541,12 +541,12 @@ void export_dependencies(DependencyCrawler* crawler, const char* output_format) 
         // TODO: Implement GraphViz export
         logr(INFO, "[Crawler] GraphViz export not yet implemented");
     } else {
-        print_dependencies(crawler);  // Default to terminal output
+        printDependencies(crawler);  // Default to terminal output
     }
 }
 
 // Clean up resources
-void free_crawler(DependencyCrawler* crawler) {
+void freeCrawler(DependencyCrawler* crawler) {
     logr(VERBOSE, "[Crawler] Cleaning up crawler resources");
     cleanPatternCache();
     
@@ -595,7 +595,7 @@ void free_crawler(DependencyCrawler* crawler) {
                 free(method->parameters);
                 
                 // Free children methods recursively
-                free_methods(method->children);
+                freeMethods(method->children);
                 
                 free(method);
                 method = next_method;
@@ -620,7 +620,7 @@ void free_crawler(DependencyCrawler* crawler) {
 }
 
 // Modify the dependency graph creation
-static void add_methods_to_graph(DependencyCrawler* crawler, const char* file_path, Method* methods) {
+static void graphMethods(DependencyCrawler* crawler, const char* file_path, Method* methods) {
     if (!crawler || !file_path || !methods) return;
     
     logr(DEBUG, "[Crawler] Adding methods to dependency graph from %s", file_path);

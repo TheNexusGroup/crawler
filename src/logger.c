@@ -50,6 +50,6 @@ void logr(LogLevel level, const char* format, ...) {
     fprintf(stderr, "\n");
 }
 
-void set_log_level(LogLevel level) {
+void setLogLevel(LogLevel level) {
     current_log_level = level;
 }

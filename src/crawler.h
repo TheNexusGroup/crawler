@@ -28,11 +28,11 @@ typedef struct {
 
 // Function prototypes
 DependencyCrawler* create_crawler(char** dirs, int dir_count, AnalysisConfig* config);
-void register_language_parser(DependencyCrawler* crawler, LanguageType type, 
+void registerParser(DependencyCrawler* crawler, LanguageType type, 
                             const LanguageParser* parser);
-void crawl_dependencies(DependencyCrawler* crawler);
-void print_dependencies(DependencyCrawler* crawler);
-void export_dependencies(DependencyCrawler* crawler, const char* output_format);
-void free_crawler(DependencyCrawler* crawler);
+void crawlDeps(DependencyCrawler* crawler);
+void printDependencies(DependencyCrawler* crawler);
+void exportDeps(DependencyCrawler* crawler, const char* output_format);
+void freeCrawler(DependencyCrawler* crawler);
 
 #endif // CRAWLER_H

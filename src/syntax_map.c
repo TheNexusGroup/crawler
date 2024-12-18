@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-void free_dependency(ExtractedDependency* dep) {
+void freeDependency(ExtractedDependency* dep) {
     while (dep) {
         ExtractedDependency* next = dep->next;
         

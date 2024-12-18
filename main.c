@@ -118,7 +118,7 @@ static void free_options(CrawlerOptions* options) {
 }
 
 int main(int argc, char* argv[]) {
-    // set_log_level(INFO);
+    // setLogLevel(INFO);
     printf("Starting dependency crawler...\n");
     
     // Parse command line arguments
@@ -158,21 +158,21 @@ int main(int argc, char* argv[]) {
 
     // Perform dependency analysis
     printf("Starting dependency analysis...\n");
-    crawl_dependencies(crawler);
+    crawlDeps(crawler);
     printf("Dependency analysis complete\n");
 
     // Export results
     printf("Exporting results...\n");
     if (options.verbose) {
-        print_dependencies(crawler);
+        printDependencies(crawler);
     } else {
-        export_dependencies(crawler, options.output_format);
+        exportDeps(crawler, options.output_format);
     }
     printf("Results exported\n");
 
     // Cleanup
     printf("Cleaning up...\n");
-    free_crawler(crawler);
+    freeCrawler(crawler);
     free_options(&options);
     printf("Done!\n");
 
