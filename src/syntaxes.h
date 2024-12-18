@@ -82,6 +82,8 @@ typedef struct Method {
     Parameter* parameters;
     int param_count;
     char* dependencies;
+    char* defined_in;
+    char* called_in;
     struct Method* next;      // Sibling methods
     struct Method* children;  // Child methods (e.g., class methods)
     bool is_static;

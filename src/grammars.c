@@ -15,7 +15,9 @@ const LanguageGrammar LANGUAGE_GRAMMARS[] = {
         .method_patterns = RUST_METHOD_PATTERNS,
         .method_pattern_count = sizeof(RUST_METHOD_PATTERNS) / sizeof(char*),
         .method_name_group = 2,
-        .scope_separator = "::"
+        .scope_separator = "::",
+        .keywords = RUST_KEYWORDS,
+        .keyword_count = sizeof(RUST_KEYWORDS) / sizeof(char*),
     },
     // C/C++
     {
@@ -27,7 +29,9 @@ const LanguageGrammar LANGUAGE_GRAMMARS[] = {
         .method_patterns = C_METHOD_PATTERNS,
         .method_pattern_count = sizeof(C_METHOD_PATTERNS) / sizeof(char*),
         .method_name_group = 2,
-        .scope_separator = "->.::"
+        .scope_separator = "->.::",
+        .keywords = C_KEYWORDS,
+        .keyword_count = sizeof(C_KEYWORDS) / sizeof(char*),
     },
     // JavaScript
     {
@@ -39,7 +43,9 @@ const LanguageGrammar LANGUAGE_GRAMMARS[] = {
         .method_patterns = JS_METHOD_PATTERNS,
         .method_pattern_count = sizeof(JS_METHOD_PATTERNS) / sizeof(char*),
         .method_name_group = 2,
-        .scope_separator = "."
+        .scope_separator = ".",
+        .keywords = JS_KEYWORDS,
+        .keyword_count = sizeof(JS_KEYWORDS) / sizeof(char*),
     },
     // Go
     {
@@ -51,7 +57,9 @@ const LanguageGrammar LANGUAGE_GRAMMARS[] = {
         .method_patterns = GO_METHOD_PATTERNS,
         .method_pattern_count = sizeof(GO_METHOD_PATTERNS) / sizeof(char*),
         .method_name_group = 2,
-        .scope_separator = "."
+        .scope_separator = ".",
+        .keywords = GO_KEYWORDS,
+        .keyword_count = sizeof(GO_KEYWORDS) / sizeof(char*),
     },
     // Python
     {
@@ -63,7 +71,9 @@ const LanguageGrammar LANGUAGE_GRAMMARS[] = {
         .method_patterns = PYTHON_METHOD_PATTERNS,
         .method_pattern_count = sizeof(PYTHON_METHOD_PATTERNS) / sizeof(char*),
         .method_name_group = 2,
-        .scope_separator = "."
+        .scope_separator = ".",
+        .keywords = PYTHON_KEYWORDS,
+        .keyword_count = sizeof(PYTHON_KEYWORDS) / sizeof(char*),
     },
     // Java
     {
@@ -75,7 +85,9 @@ const LanguageGrammar LANGUAGE_GRAMMARS[] = {
         .method_patterns = JAVA_METHOD_PATTERNS,
         .method_pattern_count = sizeof(JAVA_METHOD_PATTERNS) / sizeof(char*),
         .method_name_group = 2,
-        .scope_separator = "."
+        .scope_separator = ".",
+        .keywords = JAVA_KEYWORDS,
+        .keyword_count = sizeof(JAVA_KEYWORDS) / sizeof(char*),
     },
     // PHP
     {
@@ -87,7 +99,9 @@ const LanguageGrammar LANGUAGE_GRAMMARS[] = {
         .method_patterns = PHP_METHOD_PATTERNS,
         .method_pattern_count = sizeof(PHP_METHOD_PATTERNS) / sizeof(char*),
         .method_name_group = 2,
-        .scope_separator = "->"
+        .scope_separator = "->",
+        .keywords = PHP_KEYWORDS,
+        .keyword_count = sizeof(PHP_KEYWORDS) / sizeof(char*),
     },
     // Ruby
     {
@@ -99,7 +113,9 @@ const LanguageGrammar LANGUAGE_GRAMMARS[] = {
         .method_patterns = RUBY_METHOD_PATTERNS,
         .method_pattern_count = sizeof(RUBY_METHOD_PATTERNS) / sizeof(char*),
         .method_name_group = 2,
-        .scope_separator = "::"
+        .scope_separator = "::",
+        .keywords = RUBY_KEYWORDS,
+        .keyword_count = sizeof(RUBY_KEYWORDS) / sizeof(char*),
     },
     // Svelte
     {
@@ -111,7 +127,9 @@ const LanguageGrammar LANGUAGE_GRAMMARS[] = {
         .method_patterns = SVELTE_METHOD_PATTERNS,
         .method_pattern_count = sizeof(SVELTE_METHOD_PATTERNS) / sizeof(char*),
         .method_name_group = 2,
-        .scope_separator = "."
+        .scope_separator = ".",
+        .keywords = SVELTE_KEYWORDS,
+        .keyword_count = sizeof(SVELTE_KEYWORDS) / sizeof(char*),
     }
 };
 

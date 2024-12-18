@@ -190,6 +190,8 @@ Parameter* parse_parameters(const char* params_str) {
 
 // Helper function to check if we're within a valid scope
 static bool is_within_scope(const char* content, size_t position, ScopeContext* context) {
+    (void)context; // Explicitly mark as unused
+    
     // Count braces from start of scope definition to current position
     const char* pos = content;
     int brace_count = 0;
@@ -203,51 +205,99 @@ static bool is_within_scope(const char* content, size_t position, ScopeContext* 
     return brace_count > 0;
 }
 
+// Add this helper function before analyze_method
+static Method* extract_method_from_match(const char* content, regmatch_t* matches, const LanguageGrammar* grammar) {
+    if (!content || !matches || !grammar) return NULL;
+
+    Method* method = malloc(sizeof(Method));
+    if (!method) return NULL;
+    memset(method, 0, sizeof(Method));
+
+    // Extract method name using grammar's method_name_group
+    size_t name_len = matches[grammar->method_name_group].rm_eo - matches[grammar->method_name_group].rm_so;
+    method->name = malloc(name_len + 1);
+    if (method->name) {
+        strncpy(method->name, content + matches[grammar->method_name_group].rm_so, name_len);
+        method->name[name_len] = '\0';
+    }
+
+    // Extract parameters if they exist (usually in group 2 or 3)
+    int param_group = grammar->method_name_group + 1;
+    if (matches[param_group].rm_so != -1) {
+        size_t param_len = matches[param_group].rm_eo - matches[param_group].rm_so;
+        char* param_str = malloc(param_len + 1);
+        if (param_str) {
+            strncpy(param_str, content + matches[param_group].rm_so, param_len);
+            param_str[param_len] = '\0';
+            method->parameters = parse_parameters(param_str);
+            free(param_str);
+        }
+    }
+
+    method->next = NULL;
+    return method;
+}
+
 Method* analyze_method(const char* file_path, const char* content, const LanguageGrammar* grammar) {
-    logr(DEBUG, "[Analyzer] Starting method analysis for file: %s", file_path);
-    
-    // Get compiled patterns
-    const CompiledPatterns* patterns = compiledPatterns(grammar->type, LAYER_METHOD);
-    if (!patterns) {
-        logr(ERROR, "[Analyzer] Failed to get method patterns");
+    if (!content || !grammar) {
+        logr(ERROR, "[Analyzer] Invalid parameters for method analysis");
         return NULL;
     }
 
-    // First collect method definitions if not already done
-    collect_method_definitions(file_path, content, grammar);
-    logr(DEBUG, "[Analyzer] Found %zu method definitions", method_def_count);
+    logr(DEBUG, "[Analyzer] Starting method analysis for file: %s", file_path);
+    logr(DEBUG, "[Analyzer] Grammar has %zu method patterns", grammar->method_pattern_count);
+    
+    // Debug print patterns
+    for (size_t i = 0; i < grammar->method_pattern_count && i < 3; i++) {
+        logr(DEBUG, "[Analyzer] Pattern %zu: %s", i, grammar->method_patterns[i]);
+    }
 
     Method* head = NULL;
     Method* current = NULL;
 
-    // Now scan for references to known methods
-    for (size_t i = 0; i < method_def_count; i++) {
-        const char* method_name = method_definitions[i].name;
-        if (!method_name) continue;
-
-        // Create pattern to look for method calls
-        char pattern[256];
-        // Look for method name followed by opening parenthesis, not part of a definition
-        snprintf(pattern, sizeof(pattern), "[^a-zA-Z0-9_]%s\\s*\\(", method_name);
-        
+    // Process each pattern against the entire content
+    for (size_t i = 0; i < grammar->method_pattern_count; i++) {
         regex_t regex;
-        if (regcomp(&regex, pattern, REG_EXTENDED) == 0) {
-            regmatch_t matches[1];
-            const char* pos = content;
+        int reti = regcomp(&regex, grammar->method_patterns[i], REG_EXTENDED | REG_NEWLINE);
+        if (reti != 0) {
+            logr(ERROR, "[Analyzer] Failed to compile pattern: %s", grammar->method_patterns[i]);
+            continue;
+        }
+
+        const char* pos = content;
+        regmatch_t matches[3];  // We need up to 3 groups (full match + type + name)
+        
+        while (regexec(&regex, pos, 3, matches, 0) == 0) {
+            size_t match_len = matches[0].rm_eo - matches[0].rm_so;
+            char* full_match = malloc(match_len + 1);
+            strncpy(full_match, pos + matches[0].rm_so, match_len);
+            full_match[match_len] = '\0';
             
-            while (regexec(&regex, pos, 1, matches, 0) == 0) {
-                // Only count as a call if not part of a definition
-                char before_char = (matches[0].rm_so > 0) ? pos[matches[0].rm_so - 1] : '\n';
-                if (!isalpha(before_char) && !isdigit(before_char) && before_char != '_') {
-                    // Found a valid method call
-                    Method* method = malloc(sizeof(Method));
-                    if (!method) continue;
-                    
+            logr(DEBUG, "[Analyzer] Found potential match: '%s'", full_match);
+            
+            // Extract method name (group 2)
+            size_t name_len = matches[2].rm_eo - matches[2].rm_so;
+            char* method_name = malloc(name_len + 1);
+            strncpy(method_name, pos + matches[2].rm_so, name_len);
+            method_name[name_len] = '\0';
+
+            // Check if it's a keyword using the grammar's keyword list
+            int is_keyword = 0;
+            for (size_t k = 0; k < grammar->keyword_count; k++) {
+                if (strcmp(method_name, grammar->keywords[k]) == 0) {
+                    is_keyword = 1;
+                    break;
+                }
+            }
+
+            if (!is_keyword) {
+                Method* method = malloc(sizeof(Method));
+                if (method) {
                     memset(method, 0, sizeof(Method));
-                    method->name = strdup(method_name);
-                    method->dependencies = strdup(method_definitions[i].defined_in);
-                    
-                    // Add to list
+                    method->name = method_name;
+                    method->defined_in = strdup(file_path);
+                    method->next = NULL;
+
                     if (!head) {
                         head = method;
                         current = method;
@@ -255,11 +305,20 @@ Method* analyze_method(const char* file_path, const char* content, const Languag
                         current->next = method;
                         current = method;
                     }
+                    logr(INFO, "[Analyzer] Found method: %s in %s", method->name, file_path);
                 }
-                pos += matches[0].rm_eo;
+            } else {
+                free(method_name);
             }
-            regfree(&regex);
+            
+            free(full_match);
+            pos += matches[0].rm_eo;
         }
+        regfree(&regex);
+    }
+
+    if (!head) {
+        logr(DEBUG, "[Analyzer] No methods found in file: %s", file_path);
     }
 
     return head;
@@ -401,47 +460,12 @@ void collect_method_definitions(const char* file_path, const char* content, cons
         }
     }
 
-    // Add debug logging for content
-    const char* pos = content;
-    char preview[101] = {0};
-    strncpy(preview, pos, 100);
-    logr(DEBUG, "[Analyzer] Content preview for %s: '%.100s...'", file_path, preview);
-    logr(DEBUG, "[Analyzer] Content length: %zu bytes", strlen(content));
-
-    // Process each line to check for line endings
-    const char* line = content;
-    int line_count = 0;
-    while (*line) {
-        if (*line == '\n') line_count++;
-        line++;
-    }
-    logr(DEBUG, "[Analyzer] File has %d lines", line_count);
-
-    // Add line-by-line debug for first few lines
-    const char* line_start = content;
-    const char* line_end;
-    int line_num = 1;
-    for (int i = 0; i < 5 && *line_start; i++) {
-        line_end = strchr(line_start, '\n');
-        if (!line_end) break;
-        
-        size_t line_len = line_end - line_start;
-        char* line = malloc(line_len + 1);
-        strncpy(line, line_start, line_len);
-        line[line_len] = '\0';
-        
-        logr(DEBUG, "[Analyzer] Line %d: '%s'", line_num++, line);
-        free(line);
-        line_start = line_end + 1;
-    }
-
-    // Process each pattern
+    // Get the patterns directly from grammar first
     for (size_t i = 0; i < grammar->method_pattern_count; i++) {
         regex_t regex;
-        logr(DEBUG, "[Analyzer] Trying pattern %zu: '%s'", i, grammar->method_patterns[i]);
-        
-        if (regcomp(&regex, grammar->method_patterns[i], REG_EXTENDED | REG_NEWLINE) != 0) {
-            logr(ERROR, "[Analyzer] Failed to compile pattern %zu", i);
+        if (regcomp(&regex, grammar->method_patterns[i], REG_EXTENDED) != 0) {
+            logr(ERROR, "[Analyzer] Failed to compile method pattern: %s", 
+                 grammar->method_patterns[i]);
             continue;
         }
 
@@ -449,24 +473,16 @@ void collect_method_definitions(const char* file_path, const char* content, cons
         regmatch_t matches[5];
 
         while (regexec(&regex, pos, 5, matches, 0) == 0) {
-            // Extract the full match for debugging
-            size_t match_len = matches[0].rm_eo - matches[0].rm_so;
-            char* full_match = malloc(match_len + 1);
-            strncpy(full_match, pos + matches[0].rm_so, match_len);
-            full_match[match_len] = '\0';
-            
-            logr(DEBUG, "[Analyzer] Found potential match in %s: '%s'", file_path, full_match);
-            
-            // Extract method name (now in group 1 or 2 depending on pattern)
-            int name_group = (i == 2) ? 2 : 1;  // Adjust based on pattern
-            if (matches[name_group].rm_so != -1) {
-                size_t name_len = matches[name_group].rm_eo - matches[name_group].rm_so;
+            // Extract method name using grammar's method_name_group
+            if (matches[grammar->method_name_group].rm_so != -1) {
+                size_t name_len = matches[grammar->method_name_group].rm_eo - 
+                                matches[grammar->method_name_group].rm_so;
                 char* method_name = malloc(name_len + 1);
-                strncpy(method_name, pos + matches[name_group].rm_so, name_len);
+                strncpy(method_name, pos + matches[grammar->method_name_group].rm_so, name_len);
                 method_name[name_len] = '\0';
                 
-                logr(DEBUG, "[Analyzer] Extracted method name: '%s'", method_name);
-                
+                logr(DEBUG, "[Analyzer] Found method: %s in %s", method_name, file_path);
+
                 // Add to definitions if not already present
                 bool found = false;
                 for (size_t j = 0; j < method_def_count; j++) {
@@ -480,18 +496,16 @@ void collect_method_definitions(const char* file_path, const char* content, cons
                 if (!found && method_def_count < MAX_METHOD_DEFS) {
                     method_definitions[method_def_count].name = strdup(method_name);
                     method_definitions[method_def_count].defined_in = strdup(file_path);
+                    method_definitions[method_def_count].max_references = 32;
+                    method_definitions[method_def_count].referenced_in = calloc(32, sizeof(char*));
                     method_def_count++;
-                    logr(INFO, "[Analyzer] Added method: %s in %s", method_name, file_path);
+                    logr(INFO, "[Analyzer] Added method definition: %s in %s", 
+                         method_name, file_path);
                 }
                 free(method_name);
             }
-            
-            free(full_match);
             pos += matches[0].rm_eo;
         }
         regfree(&regex);
     }
-    
-    logr(INFO, "[Analyzer] Finished method collection for %s - found %zu methods", 
-         file_path, method_def_count);
 }

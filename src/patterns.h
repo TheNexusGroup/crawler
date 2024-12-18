@@ -46,11 +46,11 @@ static const char* C_STRUCT_PATTERNS[] = {
 };
 
 static const char* C_METHOD_PATTERNS[] = {
-    // Basic function definition - more permissive
-    "^[^;]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\)\\s*\\{",
+    // Basic function definition - capture type and name
+    "^\\s*([^;\\s]+)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\)\\s*\\{",
     
-    // Function declaration
-    "^[^;]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\);",
+    // Function declaration - capture type and name
+    "^\\s*([^;\\s]+)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\);",
     
     // Function with storage class specifiers
     "^\\s*(static|extern|inline)\\s+[^;]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\)"
@@ -186,6 +186,53 @@ static const char* SVELTE_METHOD_PATTERNS[] = {
     "^\\s*function\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\)", // Function definitions
     "^\\s*const\\s+([a-zA-Z0-9_]+)\\s*=\\s*\\(([^)]*)\\)\\s*=>", // Arrow functions
     "^\\s*export\\s+function\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\)" // Exported functions
+};
+
+// Language keywords to filter from method detection
+static const char* C_KEYWORDS[] = {
+    "if", "else", "while", "for", "do", "switch", "case", "break", "continue", 
+    "return", "goto", "sizeof", "typedef", "volatile", "register", "auto"
+};
+
+static const char* PYTHON_KEYWORDS[] = {
+    "if", "else", "elif", "while", "for", "in", "try", "except", "finally",
+    "with", "break", "continue", "return", "yield", "pass", "raise"
+};
+
+static const char* JAVA_KEYWORDS[] = {
+    "if", "else", "while", "for", "do", "switch", "case", "break", "continue",
+    "return", "try", "catch", "finally", "throw", "instanceof", "new"
+};
+
+static const char* RUBY_KEYWORDS[] = {
+    "if", "else", "elsif", "unless", "while", "until", "for", "break", "next",
+    "return", "yield", "begin", "rescue", "ensure", "retry", "redo"
+};
+
+static const char* GO_KEYWORDS[] = {
+    "if", "else", "for", "range", "switch", "case", "break", "continue",
+    "return", "goto", "fallthrough", "defer", "select", "type"
+};
+
+static const char* RUST_KEYWORDS[] = {
+    "if", "else", "while", "for", "loop", "match", "break", "continue",
+    "return", "yield", "in", "where", "move", "mut", "ref", "type"
+};
+
+static const char* PHP_KEYWORDS[] = {
+    "if", "else", "while", "for", "foreach", "do", "switch", "case", "break",
+    "continue", "return", "try", "catch", "finally", "throw", "instanceof"
+};
+
+static const char* JS_KEYWORDS[] = {
+    "if", "else", "while", "for", "do", "switch", "case", "break", "continue",
+    "return", "try", "catch", "finally", "throw", "typeof", "instanceof",
+    "new", "class", "extends", "super", "import", "export", "default", "await"
+};
+
+static const char* SVELTE_KEYWORDS[] = {
+    "if", "else", "each", "await", "then", "catch", "as",
+    "export", "const", "let", "var", "function", "import", "from"
 };
 
 
