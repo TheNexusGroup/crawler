@@ -46,10 +46,17 @@ static const char* C_STRUCT_PATTERNS[] = {
 };
 
 static const char* C_METHOD_PATTERNS[] = {
-    // Function definitions (with body) only
-    "^\\s*[a-zA-Z_][a-zA-Z0-9_]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{",
-    // Static function definitions
-    "^\\s*static\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{",
+    // Match C/C++ functions with return type and name
+    "^\\s*([a-zA-Z_][a-zA-Z0-9_]*\\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(",
+    
+    // Match C/C++ functions with just a name (e.g., constructors)
+    "^\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(",
+
+    // Match function pointers
+    "^\\s*typedef\\s+([a-zA-Z_][a-zA-Z0-9_]*\\s+)*\\(\\s*\\*\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\)\\s*\\(",
+
+    // Match functions with attributes or decorators
+    "^\\s*__attribute__\\s*\\(\\s*\\(\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\)\\s*\\)\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\("
 };
 
 // JavaScript/TypeScript patterns
@@ -84,8 +91,9 @@ static const char* PYTHON_STRUCT_PATTERNS[] = {
 };
 
 static const char* PYTHON_METHOD_PATTERNS[] = {
-    "^\\s*def\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\):",     // Regular functions
-    "^\\s*async\\s+def\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\):" // Async functions
+    // Match Python functions
+    "^\\s*def\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(",
+    "^\\s*async\\s+def\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\("
 };
 
 // Java patterns

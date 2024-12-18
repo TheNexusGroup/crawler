@@ -382,59 +382,65 @@ void collect_method_definitions(const char* file_path, const char* content, cons
         }
     }
 
-    logr(DEBUG, "[Analyzer] Starting method collection for file: %s", file_path);
-    
     const CompiledPatterns* patterns = compiledPatterns(grammar->type, LAYER_METHOD);
     if (!patterns) {
-        logr(ERROR, "[Analyzer] Failed to get method patterns");
+        logr(ERROR, "[Analyzer] No compiled patterns found for methods");
         return;
     }
 
-    logr(DEBUG, "[Analyzer] Got %zu method patterns", patterns->pattern_count);
+    logr(DEBUG, "[Analyzer] Searching for methods in file: %s", file_path);
+    logr(DEBUG, "[Analyzer] Content length: %zu bytes", strlen(content));
 
-    // Remove the 100-char sample logging and process entire file
     for (size_t i = 0; i < patterns->pattern_count; i++) {
         regex_t* regex = &patterns->compiled_patterns[i];
         const char* pos = content;
-        regmatch_t matches[4];  // [0] full match, [1] return type, [2] method name, [3] parameters
+        regmatch_t matches[5];
 
-        logr(DEBUG, "[Analyzer] Trying pattern %zu", i);
+        logr(DEBUG, "[Analyzer] Trying pattern %zu: %s", i, grammar->method_patterns[i]);
 
-        while (pos && *pos && regexec(regex, pos, 4, matches, 0) == 0) {
-            // Extract method name from group 2
-            size_t name_len = matches[2].rm_eo - matches[2].rm_so;
-            char* method_name = malloc(name_len + 1);
-            if (!method_name) continue;
+        while (pos && *pos && regexec(regex, pos, 5, matches, 0) == 0) {
+            // Extract the full match for debugging
+            int match_len = matches[0].rm_eo - matches[0].rm_so;
+            char* match_text = malloc(match_len + 1);
+            if (!match_text) continue;
 
-            strncpy(method_name, pos + matches[2].rm_so, name_len);
-            method_name[name_len] = '\0';
+            strncpy(match_text, pos + matches[0].rm_so, match_len);
+            match_text[match_len] = '\0';
 
-            logr(DEBUG, "[Analyzer] Found potential method: %s at position %ld", method_name, (pos - content));
+            logr(DEBUG, "[Analyzer] Found match: '%s'", match_text);
 
-            // Add to definitions if not already present
-            bool found = false;
-            for (size_t j = 0; j < method_def_count; j++) {
-                if (method_definitions[j].name && 
-                    strcmp(method_definitions[j].name, method_name) == 0) {
-                    found = true;
-                    free(method_name);
-                    break;
+            // Determine the correct group for the method name
+            int name_group = 1;  // Adjust based on pattern index
+
+            if (matches[name_group].rm_so != -1) {
+                int name_len = matches[name_group].rm_eo - matches[name_group].rm_so;
+                char* method_name = malloc(name_len + 1);
+                if (method_name) {
+                    strncpy(method_name, pos + matches[name_group].rm_so, name_len);
+                    method_name[name_len] = '\0';
+
+                    // Add to definitions if not already present
+                    bool found = false;
+                    for (size_t j = 0; j < method_def_count; j++) {
+                        if (method_definitions[j].name && 
+                            strcmp(method_definitions[j].name, method_name) == 0) {
+                            found = true;
+                            free(method_name);
+                            break;
+                        }
+                    }
+
+                    if (!found && method_def_count < MAX_METHOD_DEFS) {
+                        method_definitions[method_def_count].name = method_name;
+                        method_definitions[method_def_count].defined_in = strdup(file_path);
+                        method_def_count++;
+                        logr(INFO, "[Analyzer] Found method definition: %s in %s", method_name, file_path);
+                    }
                 }
             }
 
-            if (!found && method_def_count < MAX_METHOD_DEFS) {
-                method_definitions[method_def_count].name = method_name;
-                method_definitions[method_def_count].defined_in = strdup(file_path);
-                method_definitions[method_def_count].max_references = 32;
-                method_definitions[method_def_count].referenced_in = calloc(32, sizeof(char*));
-                method_def_count++;
-                logr(INFO, "[Analyzer] Found method definition: %s in %s", method_name, file_path);
-            }
-
-            // Move position pointer past the current match
+            free(match_text);
             pos += matches[0].rm_eo;
         }
     }
-
-    logr(DEBUG, "[Analyzer] Found %zu method definitions in %s", method_def_count, file_path);
 }
