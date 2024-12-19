@@ -47,7 +47,7 @@ DependencyCrawler* create_crawler(char** directories, int directory_count, Analy
         crawler->analysis_config = *config;
     } else {
         // Default configuration
-        crawler->analysis_config.analyze_modules = 1;
+        crawler->analysis_config.analyzeModules = 1;
         crawler->analysis_config.analyze_structures = 1;
         crawler->analysis_config.analyzeMethods = 1;
         crawler->analysis_config.max_depth = -1;
@@ -87,7 +87,7 @@ void registerParser(DependencyCrawler* crawler, LanguageType type,
                                                sizeof(LanguageParser) * crawler->parser_count);
     
     crawler->parsers[crawler->parser_count - 1].type = type;
-    crawler->parsers[crawler->parser_count - 1].analyze_module = parser->analyze_module;
+    crawler->parsers[crawler->parser_count - 1].analyzeModule = parser->analyzeModule;
     crawler->parsers[crawler->parser_count - 1].analyze_structure = parser->analyze_structure;
     crawler->parsers[crawler->parser_count - 1].analyzeMethod = parser->analyzeMethod;
 }
@@ -103,9 +103,9 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
     logr(VERBOSE, "[Crawler] Processing layer for file: %s", filepath);
     
     // Analyze based on configuration
-    if (crawler->analysis_config.analyze_modules) {
+    if (crawler->analysis_config.analyzeModules) {
         logr(VERBOSE, "[Crawler] Analyzing modules for file: %s", filepath);
-        ExtractedDependency* deps = analyze_module(content, grammar);
+        ExtractedDependency* deps = analyzeModule(content, grammar);
         ExtractedDependency* current_dep = deps;
         
         while (current_dep) {
@@ -163,7 +163,7 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
                      curr_struct->name ? curr_struct->name : "NULL");
                 
                 // Check for type dependencies in includes/imports
-                ExtractedDependency* type_deps = analyze_module(content, grammar);
+                ExtractedDependency* type_deps = analyzeModule(content, grammar);
                 ExtractedDependency* curr_dep = type_deps;
                 
                 while (curr_dep) {
@@ -422,7 +422,7 @@ void printDependencies(DependencyCrawler* crawler) {
 
     logr(INFO, "[Crawler] Dependencies by Layer");
     logr(INFO, "==========================\n");
-    if (crawler->analysis_config.analyze_modules) {
+    if (crawler->analysis_config.analyzeModules) {
         // Module Dependencies
         logr(INFO, "Module Dependencies:");
         logr(INFO, "-----------------");

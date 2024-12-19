@@ -30,7 +30,7 @@ extern MethodDefinition* method_definitions;
 extern size_t method_def_count;
 
 // Core analysis functions
-ExtractedDependency* analyze_module(const char* content, const LanguageGrammar* grammar);
+ExtractedDependency* analyzeModule(const char* content, const LanguageGrammar* grammar);
 Structure* analyze_structure(const char* content, const char* file_path, const LanguageGrammar* grammar);
 Method* analyzeMethod(const char* file_path, const char* content, const LanguageGrammar* grammar);
 

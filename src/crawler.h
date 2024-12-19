@@ -10,7 +10,7 @@
 // Enhanced Language Parser interface
 typedef struct {
     LanguageType type;
-    ExtractedDependency* (*analyze_module)(const char* content);
+    ExtractedDependency* (*analyzeModule)(const char* content);
     Structure* (*analyze_structure)(const char* content);
     Method* (*analyzeMethod)(const char* content);
 } LanguageParser;

@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
 
     // Create analysis configuration
     AnalysisConfig config = {
-        .analyze_modules = 0,
+        .analyzeModules = 0,
         .analyze_structures = 0,
         .analyzeMethods = 1,
         .max_depth = options.depth,

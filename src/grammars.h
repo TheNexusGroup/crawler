@@ -13,7 +13,11 @@ typedef struct {
     const char** method_patterns;
     size_t method_pattern_count;
     int method_name_group;
+    int return_type_group;
+    int params_group;
     const char* scope_separator;
+    const char** storage_classes;
+    size_t storage_class_count;
     const char** keywords;
     size_t keyword_count;
 } LanguageGrammar;

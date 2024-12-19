@@ -137,7 +137,7 @@ typedef struct {
 
 // Configuration for analysis depth
 typedef struct {
-    int analyze_modules;      // First layer
+    int analyzeModules;      // First layer
     int analyze_structures;   // Second layer
     int analyzeMethods;      // Third layer
     int max_depth;           // Maximum recursion depth
@@ -149,7 +149,7 @@ ExtractedDependency* analyze_file(const char* file_path, AnalysisConfig* config)
 
 // Language-specific analyzers
 typedef struct {
-    ExtractedDependency* (*analyze_module)(const char* content);
+    ExtractedDependency* (*analyzeModule)(const char* content);
     Structure* (*analyze_structure)(const char* content);
     Method* (*analyzeMethod)(const char* content);
 } LanguageAnalyzer;

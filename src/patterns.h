@@ -21,9 +21,8 @@ static const char* RUST_STRUCT_PATTERNS[] = {
 
 // Third Layer: Method/Parameter patterns
 static const char* RUST_METHOD_PATTERNS[] = {
-    "^\\s*fn\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\)",     // Basic function definition
-    "^\\s*self\\.([a-zA-Z0-9_]+)\\s*\\(.*\\)",         // Method calls
-    "^\\s*([a-zA-Z0-9_]+)::([a-zA-Z0-9_]+)\\s*\\(.*\\)" // Static method calls
+    // Captures: name(1), params(2), return_type(3)
+    "^[\\s]*fn[\\s]+([a-zA-Z_][a-zA-Z0-9_]*)[\\s]*\\(([^)]*)\\)[\\s]*->[\\s]*([^{;[\\s]]+)"
 };
 
 // C/C++ patterns for each layer
@@ -47,19 +46,19 @@ static const char* C_STRUCT_PATTERNS[] = {
 
 static const char* C_METHOD_PATTERNS[] = {
     // Function definition with return type and name - capture parameters
-    "([a-zA-Z_][a-zA-Z0-9_]*\\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{",
+    "([a-zA-Z_][a-zA-Z0-9_]*\\s+)([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{",
     
     // Function with storage class specifiers - capture parameters
-    "(static|extern|inline)\\s+([a-zA-Z_][a-zA-Z0-9_]*\\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{",
+    "(static|extern|inline)\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{",
     
     // Function pointer typedef - capture parameters
-    "typedef\\s+([a-zA-Z_][a-zA-Z0-9_]*\\s+)+\\(\\*([a-zA-Z_][a-zA-Z0-9_]*)\\)\\s*\\(([^)]*)\\)",
+    "typedef\\s+([a-zA-Z_][a-zA-Z0-9_]*\\s+)([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)",
     
     // Method calls - capture parameters
-    "([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)",
+    "([^#][^\\n]*)([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)",
     
     // Method calls with namespace/scope
-    "([a-zA-Z_][a-zA-Z0-9_]*)::[a-zA-Z_][a-zA-Z0-9_]*\\s*\\([^)]*\\)"
+    "([a-zA-Z_][a-zA-Z0-9_]*::)([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)"
 };
 
 // JavaScript/TypeScript patterns
@@ -94,9 +93,11 @@ static const char* PYTHON_STRUCT_PATTERNS[] = {
 };
 
 static const char* PYTHON_METHOD_PATTERNS[] = {
-    // Match Python functions
-    "^\\s*def\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(",
-    "^\\s*async\\s+def\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\("
+    // Regular function - Group 1: name, Group 2: params
+    "^[\\s]*def[\\s]+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^\\)]*)\\)\\s*:",
+    
+    // Async function - Group 1: name, Group 2: params  
+    "^[\\s]*async[\\s]+def[\\s]+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^\\)]*)\\)\\s*:"
 };
 
 // Java patterns
@@ -115,10 +116,17 @@ static const char* JAVA_STRUCT_PATTERNS[] = {
 };
 
 static const char* JAVA_METHOD_PATTERNS[] = {
-    "^\\s*public\\s+[a-zA-Z0-9_<>]+\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\)",    // Public methods
-    "^\\s*private\\s+[a-zA-Z0-9_<>]+\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\)",   // Private methods
-    "^\\s*protected\\s+[a-zA-Z0-9_<>]+\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\)", // Protected methods
-    "^\\s*[a-zA-Z0-9_<>]+\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\)"              // Package-private methods
+    // Public methods - Group 1: return type, Group 2: name, Group 3: params
+    "^[\\s]*public[\\s]+([a-zA-Z0-9_<>\\[\\]]+)[\\s]+([a-zA-Z0-9_]+)\\s*\\(([^\\)]*)\\)[\\s]*\\{",
+    
+    // Private methods
+    "^[\\s]*private[\\s]+([a-zA-Z0-9_<>\\[\\]]+)[\\s]+([a-zA-Z0-9_]+)\\s*\\(([^\\)]*)\\)[\\s]*\\{",
+    
+    // Protected methods
+    "^[\\s]*protected[\\s]+([a-zA-Z0-9_<>\\[\\]]+)[\\s]+([a-zA-Z0-9_]+)\\s*\\(([^\\)]*)\\)[\\s]*\\{",
+    
+    // Package-private methods
+    "^[\\s]*([a-zA-Z0-9_<>\\[\\]]+)[\\s]+([a-zA-Z0-9_]+)\\s*\\(([^\\)]*)\\)[\\s]*\\{"
 };
 
 // Go patterns
