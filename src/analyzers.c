@@ -491,32 +491,84 @@ static bool methodDefinition(const char* method_start, size_t len) {
 }
 
 // Add this helper function to store method dependencies
-static void addMethodDependency(MethodDefinition* caller, const char* callee_name) {
-    if (!caller || !callee_name) return;
+static void addMethodDependency(MethodDefinition* def, const char* dependency) {
+    if (!def || !dependency) return;
     
-    // Initialize dependencies string if needed
-    if (!caller->dependencies) {
-        caller->dependencies = strdup(callee_name);
-    } else {
-        // Check if dependency already exists
-        char* deps_copy = strdup(caller->dependencies);
+    // Skip empty dependencies
+    const char* trimmed = dependency;
+    while (*trimmed && isspace(*trimmed)) trimmed++;
+    if (!*trimmed) return;
+    
+    // Create array of existing dependencies
+    char** existing_deps = NULL;
+    size_t dep_count = 0;
+    
+    if (def->dependencies) {
+        // First count how many dependencies we have
+        char* deps_copy = strdup(def->dependencies);
         char* dep = strtok(deps_copy, ",");
         while (dep) {
-            while (*dep && isspace(*dep)) dep++;
-            if (strcmp(dep, callee_name) == 0) {
-                free(deps_copy);
-                return;
-            }
+            dep_count++;
             dep = strtok(NULL, ",");
         }
         free(deps_copy);
         
-        // Add new dependency
-        char* new_deps = malloc(strlen(caller->dependencies) + strlen(callee_name) + 3);
-        sprintf(new_deps, "%s, %s", caller->dependencies, callee_name);
-        free(caller->dependencies);
-        caller->dependencies = new_deps;
+        // Allocate array and fill it
+        existing_deps = malloc(dep_count * sizeof(char*));
+        if (!existing_deps) {
+            logr(ERROR, "[Analyzer] Failed to allocate dependency array");
+            return;
+        }
+        
+        deps_copy = strdup(def->dependencies);
+        dep = strtok(deps_copy, ",");
+        size_t i = 0;
+        while (dep) {
+            // Trim whitespace
+            while (*dep && isspace(*dep)) dep++;
+            char* end = dep + strlen(dep) - 1;
+            while (end > dep && isspace(*end)) *end-- = '\0';
+            
+            existing_deps[i++] = strdup(dep);
+            dep = strtok(NULL, ",");
+        }
+        free(deps_copy);
     }
+    
+    // Check if dependency already exists
+    bool found = false;
+    for (size_t i = 0; i < dep_count; i++) {
+        if (strcmp(existing_deps[i], trimmed) == 0) {
+            found = true;
+            break;
+        }
+    }
+    
+    if (!found) {
+        // Add new dependency
+        char* new_deps;
+        if (def->dependencies) {
+            size_t new_len = strlen(def->dependencies) + strlen(trimmed) + 2;
+            new_deps = malloc(new_len);
+            if (new_deps) {
+                snprintf(new_deps, new_len, "%s,%s", def->dependencies, trimmed);
+            }
+        } else {
+            new_deps = strdup(trimmed);
+        }
+        
+        if (new_deps) {
+            free(def->dependencies);
+            def->dependencies = new_deps;
+            logr(DEBUG, "[Analyzer] Added dependency %s to method %s", trimmed, def->name);
+        }
+    }
+    
+    // Cleanup
+    for (size_t i = 0; i < dep_count; i++) {
+        free(existing_deps[i]);
+    }
+    free(existing_deps);
 }
 
 // Update collectDefinitions to track dependencies
@@ -643,13 +695,37 @@ Method* analyzeMethod(const char* file_path, const char* content, const Language
                         logr(DEBUG, "[Analyzer] Created first dependency for %s: %s", 
                              current_definition->name, method->name);
                     } else {
-                        char* new_deps = malloc(strlen(current_definition->dependencies) + 
-                                              strlen(method->name) + 3);
-                        sprintf(new_deps, "%s, %s", current_definition->dependencies, method->name);
-                        free(current_definition->dependencies);
-                        current_definition->dependencies = new_deps;
-                        logr(DEBUG, "[Analyzer] Added dependency to %s: %s", 
-                             current_definition->name, method->name);
+                        // Check if dependency already exists
+                        bool exists = false;
+                        char* deps_copy = strdup(current_definition->dependencies);
+                        char* dep = strtok(deps_copy, ",");
+                        
+                        while (dep) {
+                            // Trim whitespace
+                            while (*dep && isspace(*dep)) dep++;
+                            char* end = dep + strlen(dep) - 1;
+                            while (end > dep && isspace(*end)) *end-- = '\0';
+                            
+                            if (strcmp(dep, method->name) == 0) {
+                                exists = true;
+                                break;
+                            }
+                            dep = strtok(NULL, ",");
+                        }
+                        free(deps_copy);
+                        
+                        if (!exists) {
+                            char* new_deps = malloc(strlen(current_definition->dependencies) + 
+                                                  strlen(method->name) + 3);
+                            sprintf(new_deps, "%s, %s", current_definition->dependencies, method->name);
+                            free(current_definition->dependencies);
+                            current_definition->dependencies = new_deps;
+                            logr(DEBUG, "[Analyzer] Added dependency to %s: %s", 
+                                 current_definition->name, method->name);
+                        } else {
+                            logr(DEBUG, "[Analyzer] Skipping duplicate dependency %s for %s",
+                                 method->name, current_definition->name);
+                        }
                     }
                     
                     freeMethod(method);

@@ -46,10 +46,10 @@ static const char* C_STRUCT_PATTERNS[] = {
 
 static const char* C_METHOD_PATTERNS[] = {
         // Function definition with return type and name
-    "([a-zA-Z_][a-zA-Z0-9_]*\\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{",
+    "\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{",
     
     // Function with storage class specifiers
-    "(static|extern|inline)\\s+([a-zA-Z_][a-zA-Z0-9_]*\\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*)\\)\\s*\\{",
+    "\\s+([a-zA-Z_][a-zA-Z0-9_]*\\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*)\\)\\s*\\{",
     
     // Function pointer typedef
     "typedef\\s+([a-zA-Z_][a-zA-Z0-9_]*\\s+)+\\(\\*([a-zA-Z_][a-zA-Z0-9_]*)\\)\\s*\\([^)]*\\)",
@@ -60,11 +60,6 @@ static const char* C_METHOD_PATTERNS[] = {
     // Method calls with namespace/scope
     "([a-zA-Z_][a-zA-Z0-9_]*)::[a-zA-Z_][a-zA-Z0-9_]*\\s*\\([^)]*\\)",
     
-    // Function definition pattern - captures return type(1), name(2), and params(3)
-    "^[\\s]*([a-zA-Z_][a-zA-Z0-9_\\s*]+)[\\s]+([a-zA-Z_][a-zA-Z0-9_]*)[\\s]*\\(([^)]*)\\)[\\s]*\\{",
-    
-    // Function call pattern
-    "([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^;{)]*)\\)"
 };
 
 // JavaScript/TypeScript patterns
