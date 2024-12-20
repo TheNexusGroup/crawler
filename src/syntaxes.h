@@ -90,6 +90,8 @@ typedef struct Method {
     bool is_static;
     bool is_public;
     bool is_definition;
+    const char* body_start;
+    const char* body_end;
 } Method;
 
 typedef struct Structure {
@@ -176,23 +178,24 @@ void freeStructures(Structure* structs);
 extern void freeMethods(Method* methods);
 void freeDependency(ExtractedDependency* dep);
 
-// Add this before the MethodDefinition struct (around line 180)
 typedef struct MethodReference {
     char* called_in;
     struct MethodReference* next;
 } MethodReference;
 
-// Then the existing MethodDefinition struct
+typedef struct MethodDependency {
+    char* name;
+    struct MethodDependency* next;
+} MethodDependency;
+
 typedef struct MethodDefinition {
     char* name;
-    char* defined_in;
-    char* dependencies;
-    MethodReference* references;
-    int reference_count;
     char* return_type;
-    Parameter* parameters;
-    int param_count;
+    char* defined_in;
+    MethodDependency* dependencies;  // Changed to linked list
+    size_t param_count;
+    MethodReference* references;
+    size_t reference_count;
 } MethodDefinition;
-
 
 #endif // SYNTAXES_H

@@ -395,24 +395,21 @@ static void printMethods(Method* method, const char* source_file) {
         MethodDefinition* def = findMethodDefinition(method->name);
         if (def && def->dependencies) {
             const char* dep_header_prefix = is_last_method ? "    " : "│   ";
-            logr(INFO, "  %s├── calls:", dep_header_prefix);
+            logr(INFO, "  %s ├── calls:", dep_header_prefix);
             
-            char* dep_copy = strdup(def->dependencies);
-            char* dep = strtok(dep_copy, ",");
+            MethodDependency* dep = def->dependencies;
             
             while (dep) {
-                while (*dep && isspace(*dep)) dep++;
-                const char* dep_prefix = (strtok(NULL, ",") == NULL) ? "└──" : "├──";
-                logr(INFO, "  %s│   %s %s", dep_header_prefix, dep_prefix, dep);
-                dep = strtok(NULL, ",");
+                const char* dep_prefix = (dep->next == NULL) ? "└──" : "├──";
+                logr(INFO, "  %s │     %s %s", dep_header_prefix, dep_prefix, dep->name);
+                dep = dep->next;
             }
-            free(dep_copy);
         }
         
         // Print methods that call this method
         if (def && def->references) {
             const char* ref_header_prefix = is_last_method ? "    " : "│   ";
-            logr(INFO, "  %s└── called by:", ref_header_prefix);
+            logr(INFO, "  %s └── called by:", ref_header_prefix);
             
             MethodReference* ref = def->references;
             int ref_count = 0;
@@ -430,7 +427,7 @@ static void printMethods(Method* method, const char* source_file) {
                 if (ref->called_in) {
                     current_ref++;
                     const char* ref_prefix = (current_ref == ref_count) ? "└──" : "├──";
-                    logr(INFO, "  %s    %s %s", ref_header_prefix, ref_prefix, ref->called_in);
+                    logr(INFO, "  %s       %s %s", ref_header_prefix, ref_prefix, ref->called_in);
                 }
                 ref = ref->next;
             }
