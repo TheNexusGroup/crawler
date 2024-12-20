@@ -212,6 +212,8 @@ Parameter* parse_parameters(const char* params_str) {
 static void addMethodReference(MethodDefinition* method, const char* called_in) {
     if (!method || !called_in) return;
     
+    logr(DEBUG, "[Analyzer] Adding reference to %s from %s", method->name, called_in);
+    
     // Create new reference
     MethodReference* ref = malloc(sizeof(MethodReference));
     if (!ref) return;
@@ -225,18 +227,24 @@ static void addMethodReference(MethodDefinition* method, const char* called_in) 
     } else {
         // Check for duplicate
         MethodReference* curr = method->references;
+        bool duplicate = false;
+        
         while (curr) {
             if (strcmp(curr->called_in, called_in) == 0) {
+                duplicate = true;
                 free(ref->called_in);
                 free(ref);
-                return;
+                break;
             }
-            if (!curr->next) break;
+            if (!curr->next) break; // Stop at last node
             curr = curr->next;
         }
-        curr->next = ref;
+        
+        // Add if not duplicate
+        if (!duplicate) {
+            curr->next = ref;
+        }
     }
-    method->reference_count++;
 }
 
 
@@ -494,81 +502,39 @@ static bool methodDefinition(const char* method_start, size_t len) {
 static void addMethodDependency(MethodDefinition* def, const char* dependency) {
     if (!def || !dependency) return;
     
-    // Skip empty dependencies
-    const char* trimmed = dependency;
-    while (*trimmed && isspace(*trimmed)) trimmed++;
-    if (!*trimmed) return;
+    logr(DEBUG, "[Analyzer] Adding dependency %s to method %s", dependency, def->name);
     
-    // Create array of existing dependencies
-    char** existing_deps = NULL;
-    size_t dep_count = 0;
+    // Initialize dependencies string if needed
+    if (!def->dependencies) {
+        def->dependencies = strdup(dependency);
+        return;
+    }
     
-    if (def->dependencies) {
-        // First count how many dependencies we have
-        char* deps_copy = strdup(def->dependencies);
-        char* dep = strtok(deps_copy, ",");
-        while (dep) {
-            dep_count++;
-            dep = strtok(NULL, ",");
-        }
-        free(deps_copy);
+    // Check for existing dependency
+    char* deps_copy = strdup(def->dependencies);
+    char* dep = strtok(deps_copy, ",");
+    while (dep) {
+        // Trim whitespace
+        while (*dep && isspace(*dep)) dep++;
+        char* end = dep + strlen(dep) - 1;
+        while (end > dep && isspace(*end)) *end-- = '\0';
         
-        // Allocate array and fill it
-        existing_deps = malloc(dep_count * sizeof(char*));
-        if (!existing_deps) {
-            logr(ERROR, "[Analyzer] Failed to allocate dependency array");
-            return;
+        if (strcmp(dep, dependency) == 0) {
+            free(deps_copy);
+            return; // Already exists
         }
-        
-        deps_copy = strdup(def->dependencies);
-        dep = strtok(deps_copy, ",");
-        size_t i = 0;
-        while (dep) {
-            // Trim whitespace
-            while (*dep && isspace(*dep)) dep++;
-            char* end = dep + strlen(dep) - 1;
-            while (end > dep && isspace(*end)) *end-- = '\0';
-            
-            existing_deps[i++] = strdup(dep);
-            dep = strtok(NULL, ",");
-        }
-        free(deps_copy);
+        dep = strtok(NULL, ",");
     }
+    free(deps_copy);
     
-    // Check if dependency already exists
-    bool found = false;
-    for (size_t i = 0; i < dep_count; i++) {
-        if (strcmp(existing_deps[i], trimmed) == 0) {
-            found = true;
-            break;
-        }
+    // Add new dependency
+    size_t new_len = strlen(def->dependencies) + strlen(dependency) + 3;
+    char* new_deps = malloc(new_len);
+    if (new_deps) {
+        snprintf(new_deps, new_len, "%s,%s", def->dependencies, dependency);
+        free(def->dependencies);
+        def->dependencies = new_deps;
     }
-    
-    if (!found) {
-        // Add new dependency
-        char* new_deps;
-        if (def->dependencies) {
-            size_t new_len = strlen(def->dependencies) + strlen(trimmed) + 2;
-            new_deps = malloc(new_len);
-            if (new_deps) {
-                snprintf(new_deps, new_len, "%s,%s", def->dependencies, trimmed);
-            }
-        } else {
-            new_deps = strdup(trimmed);
-        }
-        
-        if (new_deps) {
-            free(def->dependencies);
-            def->dependencies = new_deps;
-            logr(DEBUG, "[Analyzer] Added dependency %s to method %s", trimmed, def->name);
-        }
-    }
-    
-    // Cleanup
-    for (size_t i = 0; i < dep_count; i++) {
-        free(existing_deps[i]);
-    }
-    free(existing_deps);
 }
 
 // Update collectDefinitions to track dependencies
@@ -581,8 +547,11 @@ void collectDefinitions(const char* file_path, const char* content, const Langua
     const CompiledPatterns* patterns = compiledPatterns(grammar->type, LAYER_METHOD);
     if (!patterns) return;
 
-    MethodDefinition* current_method = NULL;  // Track which method we're currently in
+    MethodDefinition* current_method = NULL;
+    int brace_count = 0;
+    const char* method_start = NULL;
 
+    // First pass: collect all method definitions
     for (size_t i = 0; i < patterns->pattern_count; i++) {
         regex_t* regex = &patterns->compiled_patterns[i];
         const char* pos = content;
@@ -590,26 +559,69 @@ void collectDefinitions(const char* file_path, const char* content, const Langua
 
         while (regexec(regex, pos, 5, matches, 0) == 0) {
             Method* method = extractMatchingMethod(pos, matches, grammar);
-            if (method) {
+            if (method && !isKeyword(method->name, grammar)) {
                 if (methodDefinition(pos + matches[0].rm_so, matches[0].rm_eo - matches[0].rm_so)) {
-                    // It's a method definition
-                    if (!isKeyword(method->name, grammar) && !definitionFound(method->name)) {
+                    // Found a method definition
+                    if (!definitionFound(method->name)) {
                         addMethod(method->name, file_path, method->return_type, NULL);
-                        current_method = findMethodDefinition(method->name);
                     }
-                } else if (current_method && !isKeyword(method->name, grammar)) {
-                    // It's a method call within current_method
-                    addMethodDependency(current_method, method->name);
+                    current_method = findMethodDefinition(method->name);
+                    method_start = pos + matches[0].rm_so;
+                }
+            }
+            freeMethod(method);
+            pos += matches[0].rm_eo;
+        }
+    }
+
+    // Second pass: collect method calls within each definition
+    for (size_t i = 0; i < method_def_count; i++) {
+        current_method = &method_definitions[i];
+        if (strcmp(current_method->defined_in, file_path) != 0) continue;
+
+        // Find the method's bounds in the source
+        const char* method_start = strstr(content, current_method->name);
+        if (!method_start) continue;
+
+        // Find opening brace
+        const char* pos = method_start;
+        while (*pos && *pos != '{') pos++;
+        if (!*pos) continue;
+
+        // Find closing brace (matching)
+        const char* end = pos + 1;
+        brace_count = 1;
+        while (*end && brace_count > 0) {
+            if (*end == '{') brace_count++;
+            if (*end == '}') brace_count--;
+            end++;
+        }
+
+        // Now look for method calls within these bounds
+        for (size_t j = 0; j < patterns->pattern_count; j++) {
+            regex_t* regex = &patterns->compiled_patterns[j];
+            const char* call_pos = pos;
+            regmatch_t matches[5];
+
+            while (call_pos < end && regexec(regex, call_pos, 5, matches, 0) == 0) {
+                Method* called = extractMatchingMethod(call_pos, matches, grammar);
+                if (called && !isKeyword(called->name, grammar) && 
+                    !methodDefinition(call_pos + matches[0].rm_so, matches[0].rm_eo - matches[0].rm_so)) {
                     
-                    // Track the reference
-                    MethodDefinition* called = findMethodDefinition(method->name);
-                    if (called) {
-                        addMethodReference(called, file_path);
+                    // Add dependency to current method
+                    addMethodDependency(current_method, called->name);
+                    
+                    // Add reference from called method back to current method
+                    MethodDefinition* called_def = findMethodDefinition(called->name);
+                    if (called_def) {
+                        addMethodReference(called_def, current_method->name);
+                        logr(DEBUG, "[Analyzer] Added reference: %s is called by %s", 
+                             called->name, current_method->name);
                     }
                 }
-                freeMethod(method);
+                freeMethod(called);
+                call_pos += matches[0].rm_eo;
             }
-            pos += matches[0].rm_eo;
         }
     }
 }
@@ -629,14 +641,8 @@ char* formatMethodSignature(Method* method) {
 
 // Modify analyzeMethod to properly track relationships
 Method* analyzeMethod(const char* file_path, const char* content, const LanguageGrammar* grammar) {
-    if (!content || !grammar) {
-        logr(ERROR, "[Analyzer] Invalid parameters for method analysis");
-        return NULL;
-    }
-
     Method* head = NULL;
     Method* current = NULL;
-    Method* current_definition = NULL;
     MethodDefinition* current_method_def = NULL;
 
     // Get compiled patterns
@@ -646,6 +652,7 @@ Method* analyzeMethod(const char* file_path, const char* content, const Language
         return NULL;
     }
 
+    // First pass: find all method definitions
     for (size_t i = 0; i < patterns->pattern_count; i++) {
         regex_t* regex = &patterns->compiled_patterns[i];
         const char* pos = content;
@@ -654,107 +661,79 @@ Method* analyzeMethod(const char* file_path, const char* content, const Language
         while (regexec(regex, pos, 5, matches, 0) == 0) {
             Method* method = extractMatchingMethod(pos, matches, grammar);
             if (method && !isKeyword(method->name, grammar)) {
-                logr(DEBUG, "[Analyzer] Processing extracted method: %s (is_definition=%d)", 
-                     method->name, methodDefinition(pos + matches[0].rm_so, 
-                                                 matches[0].rm_eo - matches[0].rm_so));
-                
                 if (methodDefinition(pos + matches[0].rm_so, matches[0].rm_eo - matches[0].rm_so)) {
                     // It's a method definition
                     method->is_definition = true;
                     method->defined_in = strdup(file_path);
                     
-                    logr(DEBUG, "[Analyzer] Adding method definition: %s to dependency chain", 
-                         method->name);
-                    
                     if (!head) {
                         head = method;
                         current = method;
-                        current_definition = method;
-                        logr(DEBUG, "[Analyzer] Created new method chain with: %s", method->name);
                     } else {
                         current->next = method;
                         current = method;
                     }
-
+                    
                     if (!definitionFound(method->name)) {
-                        logr(DEBUG, "[Analyzer] Adding method definition: %s", method->name);
                         addMethod(method->name, file_path, method->return_type, NULL);
-                        current_method_def = findMethodDefinition(method->name);
-                    } else {
-                        current_method_def = findMethodDefinition(method->name);
-                        logr(DEBUG, "[Analyzer] Added method to chain: %s", method->name);
                     }
-                } else if (current_definition) {
-                    // It's a method call within current_definition
-                    logr(DEBUG, "[Analyzer] Found method call: %s in %s", 
-                         method->name, current_definition->name);
+                    current_method_def = findMethodDefinition(method->name);
                     
-                    // Add to current definition's dependencies
-                    if (!current_definition->dependencies) {
-                        current_definition->dependencies = strdup(method->name);
-                        logr(DEBUG, "[Analyzer] Created first dependency for %s: %s", 
-                             current_definition->name, method->name);
-                    } else {
-                        // Check if dependency already exists
-                        bool exists = false;
-                        char* deps_copy = strdup(current_definition->dependencies);
-                        char* dep = strtok(deps_copy, ",");
-                        
-                        while (dep) {
-                            // Trim whitespace
-                            while (*dep && isspace(*dep)) dep++;
-                            char* end = dep + strlen(dep) - 1;
-                            while (end > dep && isspace(*end)) *end-- = '\0';
-                            
-                            if (strcmp(dep, method->name) == 0) {
-                                exists = true;
-                                break;
-                            }
-                            dep = strtok(NULL, ",");
-                        }
-                        free(deps_copy);
-                        
-                        if (!exists) {
-                            char* new_deps = malloc(strlen(current_definition->dependencies) + 
-                                                  strlen(method->name) + 3);
-                            sprintf(new_deps, "%s, %s", current_definition->dependencies, method->name);
-                            free(current_definition->dependencies);
-                            current_definition->dependencies = new_deps;
-                            logr(DEBUG, "[Analyzer] Added dependency to %s: %s", 
-                                 current_definition->name, method->name);
-                        } else {
-                            logr(DEBUG, "[Analyzer] Skipping duplicate dependency %s for %s",
-                                 method->name, current_definition->name);
-                        }
-                    }
-                    
-                    freeMethod(method);
+                    // Update method references for the definition
+                    updateMethodReferences(file_path, method);
                 } else {
-                    logr(DEBUG, "[Analyzer] Skipping method: %s (no current definition)", 
-                         method->name);
-                    freeMethod(method);
+                    // It's a method call - add reference
+                    MethodDefinition* called_method = findMethodDefinition(method->name);
+                    if (called_method && current_method_def) {
+                        addMethodReference(called_method, current_method_def->name);
+                    }
                 }
-            } else if (method) {
-                logr(DEBUG, "[Analyzer] Skipping keyword or invalid method: %s", 
-                     method ? method->name : "NULL");
+            } else {
                 freeMethod(method);
             }
             pos += matches[0].rm_eo;
         }
     }
 
-    // Update references for all methods after we've collected all dependencies
-    Method* m = head;
-    while (m) {
-        if (m->is_definition) {
-            logr(DEBUG, "[Analyzer] Updating references for method: %s", m->name);
-            updateMethodReferences(file_path, m);
+    // Second pass: find all method calls within each definition
+    Method* def = head;
+    while (def) {
+        current_method_def = findMethodDefinition(def->name);
+        if (!current_method_def) {
+            def = def->next;
+            continue;
         }
-        m = m->next;
+
+        // Reset position for scanning calls within this definition
+        for (size_t i = 0; i < patterns->pattern_count; i++) {
+            regex_t* regex = &patterns->compiled_patterns[i];
+            const char* pos = content;
+            regmatch_t matches[5];
+
+            while (regexec(regex, pos, 5, matches, 0) == 0) {
+                Method* called = extractMatchingMethod(pos, matches, grammar);
+                if (called && !isKeyword(called->name, grammar) && 
+                    !methodDefinition(pos + matches[0].rm_so, matches[0].rm_eo - matches[0].rm_so)) {
+                    
+                    // Add the call to current method's dependencies
+                    addMethodDependency(current_method_def, called->name);
+                    
+                    // Add reference from called method back to current method
+                    MethodDefinition* called_def = findMethodDefinition(called->name);
+                    if (called_def) {
+                        addMethodReference(called_def, current_method_def->name);
+                    }
+                    
+                    freeMethod(called);
+                } else {
+                    freeMethod(called);
+                }
+                pos += matches[0].rm_eo;
+            }
+        }
+        def = def->next;
     }
 
-    logr(DEBUG, "[Analyzer] Completed analysis for file: %s, found %d methods", 
-         file_path, countMethods(head));
     return head;
 }
 

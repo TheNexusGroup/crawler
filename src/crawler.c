@@ -392,11 +392,12 @@ static void printMethods(Method* method, const char* source_file) {
         free(signature);
         
         // Print methods this method calls
-        if (method->dependencies) {
+        MethodDefinition* def = findMethodDefinition(method->name);
+        if (def && def->dependencies) {
             const char* dep_header_prefix = is_last_method ? "    " : "│   ";
             logr(INFO, "  %s├── calls:", dep_header_prefix);
             
-            char* dep_copy = strdup(method->dependencies);
+            char* dep_copy = strdup(def->dependencies);
             char* dep = strtok(dep_copy, ",");
             
             while (dep) {
@@ -408,28 +409,27 @@ static void printMethods(Method* method, const char* source_file) {
             free(dep_copy);
         }
         
-        // Print where this method is called
-        if (method->references) {
+        // Print methods that call this method
+        if (def && def->references) {
             const char* ref_header_prefix = is_last_method ? "    " : "│   ";
             logr(INFO, "  %s├── called by:", ref_header_prefix);
             
-            // Count valid references first
-            MethodReference* count_ref = method->references;
-            int valid_refs = 0;
+            MethodReference* ref = def->references;
+            int ref_count = 0;
+            MethodReference* count_ref = ref;
+            
+            // Count references first
             while (count_ref) {
-                if (count_ref->called_in && strcmp(count_ref->called_in, source_file) != 0) {
-                    valid_refs++;
-                }
+                if (count_ref->called_in) ref_count++;
                 count_ref = count_ref->next;
             }
             
             // Print references
             int current_ref = 0;
-            MethodReference* ref = method->references;
             while (ref) {
-                if (ref->called_in && strcmp(ref->called_in, source_file) != 0) {
+                if (ref->called_in) {
                     current_ref++;
-                    const char* ref_prefix = (current_ref == valid_refs) ? "└──" : "├──";
+                    const char* ref_prefix = (current_ref == ref_count) ? "└──" : "├──";
                     logr(INFO, "  %s│   %s %s", ref_header_prefix, ref_prefix, ref->called_in);
                 }
                 ref = ref->next;
