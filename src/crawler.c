@@ -412,7 +412,7 @@ static void printMethods(Method* method, const char* source_file) {
         // Print methods that call this method
         if (def && def->references) {
             const char* ref_header_prefix = is_last_method ? "    " : "│   ";
-            logr(INFO, "  %s├── called by:", ref_header_prefix);
+            logr(INFO, "  %s└── called by:", ref_header_prefix);
             
             MethodReference* ref = def->references;
             int ref_count = 0;
@@ -430,7 +430,7 @@ static void printMethods(Method* method, const char* source_file) {
                 if (ref->called_in) {
                     current_ref++;
                     const char* ref_prefix = (current_ref == ref_count) ? "└──" : "├──";
-                    logr(INFO, "  %s│   %s %s", ref_header_prefix, ref_prefix, ref->called_in);
+                    logr(INFO, "  %s    %s %s", ref_header_prefix, ref_prefix, ref->called_in);
                 }
                 ref = ref->next;
             }
