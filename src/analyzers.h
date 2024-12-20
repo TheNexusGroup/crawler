@@ -49,5 +49,6 @@ void freeExtractedDep(ExtractedDependency* dep);
 // Add these if they're not already present
 void freeMethod_references(MethodReference* refs);
 void freeMethod_definitions(void);
+int countMethods(Method* methods);
 
 #endif // ANALYZERS_H

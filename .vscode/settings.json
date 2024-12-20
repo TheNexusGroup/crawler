@@ -8,6 +8,7 @@
         "text_encoding": "cpp",
         "typeindex": "cpp",
         "typeinfo": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "crawler.h": "c"
     }
 }
