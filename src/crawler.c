@@ -10,7 +10,7 @@
 
 // Add these after includes
 static void processFile(DependencyCrawler* crawler, const char* file_path);
-static void crawlDir(DependencyCrawler* crawler, const char* dir_path);
+static void crawlDir(DependencyCrawler* crawler, const char* path);
 static void processLayer(DependencyCrawler* crawler, const char* filepath, 
                         const char* content, const LanguageGrammar* grammar);
 static void graphMethods(DependencyCrawler* crawler, const char* file_path, 
@@ -213,11 +213,14 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
 
     // Analyze methods
     if (crawler->analysis_config.analyzeMethods) {
-        logr(DEBUG, "[Crawler] Analyzing methods for file: %s", filepath);
+        logr(VERBOSE, "[Crawler] Analyzing methods in %s", filepath);
         Method* methods = analyzeMethod(filepath, content, grammar);
-        
         if (methods) {
+            // Add methods to dependency graph
             graphMethods(crawler, filepath, methods);
+            
+            // Note: Don't free methods here as graphMethods takes ownership
+            logr(VERBOSE, "[Crawler] Added methods to dependency graph");
         }
     }
     
@@ -228,7 +231,32 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
 static void processFile(DependencyCrawler* crawler, const char* file_path) {
     if (!crawler || !file_path) return;
     
-    logr(VERBOSE, "[Crawler] Processing file: %s", file_path);
+    // Add extension check before processing
+    const char* ext = strrchr(file_path, '.');
+    if (!ext) {
+        logr(DEBUG, "[Crawler] Skipping file without extension: %s", file_path);
+        return;
+    }
+    ext++; // Skip the dot
+
+    // Skip files we know we don't want to process
+    if (strcasecmp(ext, "txt") == 0 ||
+        strcasecmp(ext, "md") == 0 ||
+        strcasecmp(ext, "json") == 0 ||
+        strcasecmp(ext, "yml") == 0 ||
+        strcasecmp(ext, "yaml") == 0 ||
+        strcasecmp(ext, "xml") == 0 ||
+        strcasecmp(ext, "csv") == 0 ||
+        strcasecmp(ext, "log") == 0 ||
+        strcasecmp(ext, "LICENSE") == 0 ||
+        strcasecmp(ext, "gitignore") == 0 ||
+        strcasecmp(ext, "lock") == 0) {
+        logr(DEBUG, "[Crawler] Skipping non-source file: %s", file_path);
+        return;
+    }
+
+    // Log the file we're about to process
+    logr(INFO, "[Crawler] Attempting to process file: %s (extension: %s)", file_path, ext);
     
     // Read file content
     FILE* file = fopen(file_path, "r");
@@ -269,44 +297,70 @@ static void processFile(DependencyCrawler* crawler, const char* file_path) {
 }
 
 // Recursively crawl directories
-static void crawlDir(DependencyCrawler* crawler, const char* dir_path) {
-    if (!crawler || !dir_path) {
+static void crawlDir(DependencyCrawler* crawler, const char* path) {
+    if (!crawler || !path) {
         logr(ERROR, "[Crawler] Invalid parameters in crawlDir");
         return;
     }
 
-    logr(VERBOSE, "[Crawler] Opening directory: %s", dir_path);
-    DIR* dir = opendir(dir_path);
-    if (!dir) {
-        logr(ERROR, "[Crawler] Failed to open directory: %s", dir_path);
+    // Check if path is a file or directory
+    struct stat path_stat;
+    if (stat(path, &path_stat) != 0) {
+        logr(ERROR, "[Crawler] Failed to stat path: %s", path);
         return;
     }
-    
-    struct dirent* entry;
-    while ((entry = readdir(dir)) != NULL) {
-        if (entry->d_name[0] == '.') continue;  // Skip hidden files/directories
-        
-        char path[1024];
-        snprintf(path, sizeof(path), "%s/%s", dir_path, entry->d_name);
-        logr(VERBOSE, "[Crawler] Processing entry: %s", path);
-        
-        struct stat statbuf;
-        if (stat(path, &statbuf) != 0) {
-            logr(ERROR, "[Crawler] Failed to stat file: %s", path);
-            continue;
-        }
-        
-        if (S_ISDIR(statbuf.st_mode)) {
-            logr(VERBOSE, "[Crawler] Found directory: %s", path);
-            crawlDir(crawler, path);
-        } else {
-            logr(VERBOSE, "[Crawler] Found file: %s", path);
-            processFile(crawler, path);
-        }
+
+    // If it's a regular file, process it directly
+    if (S_ISREG(path_stat.st_mode)) {
+        logr(DEBUG, "[Crawler] Processing file: %s", path);
+        processFile(crawler, path);
+        return;
     }
-    
-    closedir(dir);
-    logr(VERBOSE, "[Crawler] Finished processing directory: %s", dir_path);
+
+    // If it's a directory, process its contents
+    if (S_ISDIR(path_stat.st_mode)) {
+        logr(INFO, "[Crawler] Opening directory: %s", path);
+        DIR* dir = opendir(path);
+        if (!dir) {
+            logr(ERROR, "[Crawler] Failed to open directory: %s", path);
+            return;
+        }
+
+        // Skip common non-source directories
+        const char* dir_name = strrchr(path, '/');
+        dir_name = dir_name ? dir_name + 1 : path;
+        
+        if (strcmp(dir_name, "node_modules") == 0 ||
+            strcmp(dir_name, ".git") == 0 ||
+            strcmp(dir_name, "build") == 0 ||
+            strcmp(dir_name, "dist") == 0 ||
+            strcmp(dir_name, "target") == 0 ||
+            strcmp(dir_name, "vendor") == 0) {
+            logr(DEBUG, "[Crawler] Skipping non-source directory: %s", path);
+            closedir(dir);
+            return;
+        }
+
+        struct dirent* entry;
+        while ((entry = readdir(dir)) != NULL) {
+            // Skip hidden files and special directories
+            if (entry->d_name[0] == '.' || 
+                strcmp(entry->d_name, "..") == 0) {
+                continue;
+            }
+            
+            char full_path[1024];
+            snprintf(full_path, sizeof(full_path), "%s/%s", path, entry->d_name);
+            logr(DEBUG, "[Crawler] Found entry: %s", full_path);
+            
+            // Recursively process the entry
+            crawlDir(crawler, full_path);
+        }
+        
+        closedir(dir);
+    } else {
+        logr(DEBUG, "[Crawler] Skipping non-regular file/directory: %s", path);
+    }
 }
 
 // Main crawling function

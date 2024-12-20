@@ -3,6 +3,11 @@
         "*.tf": "terraform",
         "*.rs": "rust",
         "*.v": "vernacular",
-        "syntaxes.h": "c"
+        "syntaxes.h": "c",
+        "chrono": "cpp",
+        "text_encoding": "cpp",
+        "typeindex": "cpp",
+        "typeinfo": "cpp",
+        "*.inc": "cpp"
     }
 }

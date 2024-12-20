@@ -4,42 +4,56 @@
 #include <string.h>
 #include <stdio.h>
 #include "analyzers.h"
+#include <ctype.h>
+#include "logger.h"
 
-// Add at the top of the file, after includes
 LanguageType languageType(const char* filename) {
-    static const struct {
-        const char* ext;
-        LanguageType type;
-    } extension_map[] = {
-        {"rs", LANG_RUST},
-        {"c", LANG_C},
-        {"h", LANG_C}, 
-        {"cpp", LANG_C},
-        {"hpp", LANG_C},
-        {"hxx", LANG_C},
-        {"cxx", LANG_C},
-        {"ts", LANG_JAVASCRIPT},
-        {"js", LANG_JAVASCRIPT},
-        {"go", LANG_GO},
-        {"py", LANG_PYTHON}, 
-        {"java", LANG_JAVA},
-        {"php", LANG_PHP},
-        {"rb", LANG_RUBY},
-        {"svelte", LANG_SVELTE}
-    };
+    if (!filename) return LANG_RUST; // Default to first language
     
-    const char* dot = strrchr(filename, '.');
-    if (!dot) return (LanguageType)-1;
-    
-    const char* ext = dot + 1;
-    for (size_t i = 0; i < sizeof(extension_map) / sizeof(extension_map[0]); i++) {
-        if (strcmp(ext, extension_map[i].ext) == 0) {
-            return extension_map[i].type;
-        }
+    const char* ext = strrchr(filename, '.');
+    if (!ext) {
+        logr(DEBUG, "[Syntaxes] Skipping file without extension: %s", filename);
+        return LANG_RUST; // Default to first language
     }
     
-    return (LanguageType)-1;
+    ext++; // Skip the dot
+    
+    // Convert extension to lowercase for comparison
+    char ext_lower[32] = {0};
+    size_t i;
+    for (i = 0; i < sizeof(ext_lower) - 1 && ext[i]; i++) {
+        ext_lower[i] = tolower(ext[i]);
+    }
+    
+    // Match extensions to language types
+    if (strcmp(ext_lower, "rs") == 0) {
+        return LANG_RUST;
+    } else if (strcmp(ext_lower, "c") == 0 || 
+               strcmp(ext_lower, "h") == 0 || 
+               strcmp(ext_lower, "cpp") == 0 || 
+               strcmp(ext_lower, "hpp") == 0) {
+        return LANG_C;
+    } else if (strcmp(ext_lower, "js") == 0 || 
+               strcmp(ext_lower, "jsx") == 0 || 
+               strcmp(ext_lower, "ts") == 0 || 
+               strcmp(ext_lower, "tsx") == 0) {
+        return LANG_JAVASCRIPT;
+    } else if (strcmp(ext_lower, "go") == 0) {
+        return LANG_GO;
+    } else if (strcmp(ext_lower, "py") == 0) {
+        return LANG_PYTHON;
+    } else if (strcmp(ext_lower, "java") == 0) {
+        return LANG_JAVA;
+    } else if (strcmp(ext_lower, "php") == 0) {
+        return LANG_PHP;
+    } else if (strcmp(ext_lower, "rb") == 0) {
+        return LANG_RUBY;
+    }
+    
+    logr(DEBUG, "[Syntaxes] Unsupported file extension: %s", ext_lower);
+    return LANG_RUST; // Default to first language instead of -1
 }
+
 
 // Analyze a file based on the given configuration
 ExtractedDependency* analyze_file(const char* file_path, AnalysisConfig* config) {
@@ -186,14 +200,13 @@ void exportGraph(DependencyGraph* graph, const char* format, const char* output_
 const char* languageName(LanguageType type) {
     switch (type) {
         case LANG_RUST: return "Rust";
-        case LANG_C: return "C";
+        case LANG_C: return "C/C++";
         case LANG_JAVASCRIPT: return "JavaScript";
         case LANG_GO: return "Go";
         case LANG_PYTHON: return "Python";
         case LANG_JAVA: return "Java";
         case LANG_PHP: return "PHP";
         case LANG_RUBY: return "Ruby";
-        case LANG_SVELTE: return "Svelte";
         default: return "Unknown";
     }
 }

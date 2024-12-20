@@ -15,8 +15,8 @@ int initPatternCache(void) {
     memset(&pattern_cache, 0, sizeof(PatternCache));
     pattern_cache.initialized = 0;  // Explicitly mark as not initialized
     
-    // For each language type
-    for (LanguageType lang = 0; lang < LANGUAGE_GRAMMAR_COUNT; lang++) {
+    // For each language type (explicitly list the range)
+    for (LanguageType lang = LANG_RUST; lang <= LANG_RUBY; lang++) {
         const LanguageGrammar* grammar = languageGrammars(lang);
         if (!grammar) {
             logr(ERROR, "[PatternCache] Failed to get grammar for language %d", lang);
@@ -94,7 +94,8 @@ void cleanPatternCache(void) {
         return;
     }
 
-    for (LanguageType lang = LANG_RUST; lang <= LANG_SVELTE; lang++) {
+    // Use explicit enum range
+    for (LanguageType lang = LANG_RUST; lang <= LANG_RUBY; lang++) {
         //printf("Cleaning patterns for language %d...\n", lang);
         
         // Free module patterns
@@ -123,7 +124,7 @@ void cleanPatternCache(void) {
 }
 
 const CompiledPatterns* compiledPatterns(LanguageType lang, AnalysisLayer layer) {
-    if (!pattern_cache.initialized || lang < LANG_RUST || lang > LANG_SVELTE) {
+    if (!pattern_cache.initialized || lang < LANG_RUST || lang > LANG_RUBY) {
         return NULL;
     }
 

@@ -11,9 +11,9 @@ typedef struct {
 
 // Pattern cache structure
 typedef struct {
-    CompiledPatterns module_patterns[MAX_LANGUAGES];
-    CompiledPatterns struct_patterns[MAX_LANGUAGES];
-    CompiledPatterns method_patterns[MAX_LANGUAGES];
+    CompiledPatterns module_patterns[LANG_RUBY + 1];
+    CompiledPatterns struct_patterns[LANG_RUBY + 1];
+    CompiledPatterns method_patterns[LANG_RUBY + 1];
     int initialized;
 } PatternCache;
 

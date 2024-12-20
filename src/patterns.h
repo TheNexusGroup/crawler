@@ -45,20 +45,11 @@ static const char* C_STRUCT_PATTERNS[] = {
 };
 
 static const char* C_METHOD_PATTERNS[] = {
-    // Function definition with return type and name - capture parameters
-    "([a-zA-Z_][a-zA-Z0-9_]*\\s+)([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{",
+    // Basic function pattern - just capture the whole declaration
+    "^[\\s]*([a-zA-Z_][a-zA-Z0-9_\\s*]+\\([^)]*\\))[\\s]*[{;]",
     
-    // Function with storage class specifiers - capture parameters
-    "(static|extern|inline)\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{",
-    
-    // Function pointer typedef - capture parameters
-    "typedef\\s+([a-zA-Z_][a-zA-Z0-9_]*\\s+)([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)",
-    
-    // Method calls - capture parameters
-    "([^#][^\\n]*)([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)",
-    
-    // Method calls with namespace/scope
-    "([a-zA-Z_][a-zA-Z0-9_]*::)([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)"
+    // Function call pattern
+    "([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^;{)]*)\\)"
 };
 
 // JavaScript/TypeScript patterns
@@ -185,23 +176,6 @@ static const char* RUBY_METHOD_PATTERNS[] = {
     "^\\s*define_method\\s+:([a-zA-Z0-9_?!]+)"          // Dynamic method definitions
 };
 
-// Svelte patterns
-static const char* SVELTE_MODULE_PATTERNS[] = {
-    "^\\s*import\\s+.*\\s+from\\s+['\"]([^'\"]+)['\"]",  // imports
-    "^\\s*export\\s+.*\\s+from\\s+['\"]([^'\"]+)['\"]"   // exports
-};
-
-static const char* SVELTE_STRUCT_PATTERNS[] = {
-    "^\\s*<script[^>]*>",                       // Script block
-    "^\\s*<style[^>]*>"                        // Style block
-};
-
-static const char* SVELTE_METHOD_PATTERNS[] = {
-    "^\\s*function\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\)", // Function definitions
-    "^\\s*const\\s+([a-zA-Z0-9_]+)\\s*=\\s*\\(([^)]*)\\)\\s*=>", // Arrow functions
-    "^\\s*export\\s+function\\s+([a-zA-Z0-9_]+)\\s*\\(([^)]*)\\)" // Exported functions
-};
-
 static const char* RUST_KEYWORDS[] = {
     "if", "else", "while", "for", "loop", "match", "break", "continue",
     "return", "yield", "in", "where", "move", "mut", "ref", "type"
@@ -210,7 +184,15 @@ static const char* RUST_KEYWORDS[] = {
 // Language keywords to filter from method detection
 static const char* C_KEYWORDS[] = {
     "if", "else", "while", "for", "do", "switch", "case", "break", "continue", 
-    "return", "goto", "sizeof", "typedef", "volatile", "register", "auto"
+    "return", "goto", "sizeof", "typedef", "volatile", "register",
+};
+
+static const char* C_TYPES[] = {
+    "void", "int", "float", "double", "char", "bool", "struct", "enum", "union", "typedef", "void*", "int*", "float*", "double*", "char*", "bool*", "struct*", "enum*", "union*", "typedef*"
+};
+
+static const char* C_PREFIXES[] = {
+    "static", "extern", "inline", "const", "volatile", "register", "auto"
 };
 
 static const char* PYTHON_KEYWORDS[] = {
@@ -244,10 +226,74 @@ static const char* JS_KEYWORDS[] = {
     "new", "class", "extends", "super", "import", "export", "default", "await"
 };
 
-static const char* SVELTE_KEYWORDS[] = {
-    "if", "else", "each", "await", "then", "catch", "as",
-    "export", "const", "let", "var", "function", "import", "from"
+// Rust types and declarations
+static const char* RUST_TYPES[] = {
+    "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128",
+    "f32", "f64", "bool", "char", "str", "String", "Vec", "Option", "Result"
 };
 
+static const char* RUST_PREFIXES[] = {
+    "let", "const", "static", "fn", "struct", "enum", "trait", "impl", "type"
+};
+
+// JavaScript/TypeScript types and declarations
+static const char* JS_TYPES[] = {
+    "number", "string", "boolean", "object", "undefined", "symbol", "bigint",
+    "any", "void", "never", "unknown"
+};
+
+static const char* JS_PREFIXES[] = {
+    "var", "let", "const", "function", "class", "interface", "type", "enum"
+};
+
+// Python types and declarations
+static const char* PYTHON_TYPES[] = {
+    "int", "float", "str", "bool", "list", "tuple", "dict", "set", "frozenset",
+    "bytes", "bytearray", "memoryview", "complex"
+};
+
+static const char* PYTHON_PREFIXES[] = {
+    "def", "class", "lambda", "global", "nonlocal", "import", "from", "as"
+};
+
+// Java types and declarations
+static const char* JAVA_TYPES[] = {
+    "int", "long", "short", "byte", "float", "double", "boolean", "char",
+    "String", "Object", "List", "Map", "Set", "ArrayList", "HashMap"
+};
+
+static const char* JAVA_PREFIXES[] = {
+    "class", "interface", "enum", "abstract", "final", "static", "synchronized"
+};
+
+// Go types and declarations
+static const char* GO_TYPES[] = {
+    "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64",
+    "float32", "float64", "complex64", "complex128", "byte", "rune", "string", "bool"
+};
+
+static const char* GO_PREFIXES[] = {
+    "var", "const", "func", "type", "struct", "interface", "map", "chan"
+};
+
+// PHP types and declarations
+static const char* PHP_TYPES[] = {
+    "int", "float", "string", "bool", "array", "object", "callable", "iterable",
+    "mixed", "void", "null"
+};
+
+static const char* PHP_PREFIXES[] = {
+    "class", "interface", "trait", "function", "const", "var", "public", "private", "protected"
+};
+
+// Ruby types and declarations
+static const char* RUBY_TYPES[] = {
+    "Integer", "Float", "String", "Array", "Hash", "Symbol", "TrueClass", "FalseClass",
+    "NilClass", "Object", "Class", "Module"
+};
+
+static const char* RUBY_PREFIXES[] = {
+    "def", "class", "module", "begin", "rescue", "ensure", "alias", "undef"
+};
 
 #endif // PATTERNS_H

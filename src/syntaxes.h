@@ -7,7 +7,7 @@
 // Common constants
 #define MAX_PATTERN_LENGTH 256
 #define MAX_MATCHES 10
-#define MAX_LANGUAGES 10
+#define MAX_LANGUAGES 8
 #define MAX_TRAITS 32
 #define MAX_PARAMETERS 16
 #define MAX_DEPENDENCIES 64
@@ -19,15 +19,14 @@
 
 // Enum to represent different supported languages
 typedef enum {
-    LANG_RUST,
-    LANG_C,
-    LANG_JAVASCRIPT,
-    LANG_GO,
-    LANG_PYTHON,
-    LANG_JAVA,
-    LANG_PHP,
-    LANG_RUBY,
-    LANG_SVELTE,
+    LANG_RUST = 0,        // Index 0
+    LANG_C = 1,          // Index 1
+    LANG_JAVASCRIPT = 2, // Index 2
+    LANG_GO = 3,         // Index 3
+    LANG_PYTHON = 4,     // Index 4
+    LANG_JAVA = 5,       // Index 5
+    LANG_PHP = 6,        // Index 6
+    LANG_RUBY = 7        // Index 7
 } LanguageType;
 
 // Language type functions
@@ -78,6 +77,7 @@ typedef struct {
 // Then the full struct definitions
 typedef struct Method {
     char* name;
+    char* prefix;
     char* return_type;
     Parameter* parameters;
     int param_count;

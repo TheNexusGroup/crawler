@@ -20,6 +20,10 @@ typedef struct {
     size_t storage_class_count;
     const char** keywords;
     size_t keyword_count;
+    const char** types;
+    size_t type_count;
+    const char** prefixes;
+    size_t prefix_count;
 } LanguageGrammar;
 
 extern const LanguageGrammar LANGUAGE_GRAMMARS[];
