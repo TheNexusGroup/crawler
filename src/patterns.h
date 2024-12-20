@@ -45,8 +45,8 @@ static const char* C_STRUCT_PATTERNS[] = {
 };
 
 static const char* C_METHOD_PATTERNS[] = {
-    // Basic function pattern - just capture the whole declaration
-    "^[\\s]*([a-zA-Z_][a-zA-Z0-9_\\s*]+\\([^)]*\\))[\\s]*[{;]",
+    // Function definition pattern - captures return type(1), name(2), and params(3)
+    "^[\\s]*([a-zA-Z_][a-zA-Z0-9_\\s*]+)[\\s]+([a-zA-Z_][a-zA-Z0-9_]*)[\\s]*\\(([^)]*)\\)[\\s]*\\{",
     
     // Function call pattern
     "([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^;{)]*)\\)"

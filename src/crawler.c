@@ -381,71 +381,62 @@ void crawlDeps(DependencyCrawler* crawler) {
     }
 }
 
-char* formatMethodSignature(Method* method) {
-    char* signature = malloc(256);  // Adjust size as needed
-    if (!signature) return NULL;
-    
-    if (method->return_type) {
-        snprintf(signature, 256, "%s() -> %s", method->name, method->return_type);
-    } else {
-        snprintf(signature, 256, "%s()", method->name);
-    }
-    return signature;
-}
-
-// Remove static keyword from findMethodDefinition too
-MethodDefinition* findMethodDefinition(const char* method_name) {
-    if (!method_name) return NULL;
-    
-    for (size_t i = 0; i < method_def_count; i++) {
-        if (strcmp(method_definitions[i].name, method_name) == 0) {
-            return &method_definitions[i];
-        }
-    }
-    return NULL;
-}
 // In printDependencies function
-static void printMethods(Method* methods, const char* source_file) {
-    if (!methods) return;
-    
-    printf("%s\n", source_file);
-    Method* current = methods;
-    
-    while (current) {
-        char* signature = formatMethodSignature(current);
-        printf("   |- %s\n", signature);
+static void printMethods(Method* method, const char* source_file) {
+    while (method) {
+        bool is_last_method = (method->next == NULL);
+        const char* method_prefix = is_last_method ? "└──" : "├──";
+        
+        char* signature = formatMethodSignature(method);
+        logr(INFO, "  %s %s", method_prefix, signature);
         free(signature);
         
-        // Print calls
-        if (current->dependencies) {
-            printf("   |      |- calls\n");
-            char* deps_copy = strdup(current->dependencies);
-            char* dep = strtok(deps_copy, ",");
+        // Print methods this method calls
+        if (method->dependencies) {
+            const char* dep_header_prefix = is_last_method ? "    " : "│   ";
+            logr(INFO, "  %s├── calls:", dep_header_prefix);
+            
+            char* dep_copy = strdup(method->dependencies);
+            char* dep = strtok(dep_copy, ",");
+            
             while (dep) {
                 while (*dep && isspace(*dep)) dep++;
-                MethodDefinition* called = findMethodDefinition(dep);
-                if (called) {
-                    printf("   |      |       |- %s (in %s)\n", 
-                           dep, called->defined_in);
-                }
+                const char* dep_prefix = (strtok(NULL, ",") == NULL) ? "└──" : "├──";
+                logr(INFO, "  %s│   %s %s", dep_header_prefix, dep_prefix, dep);
                 dep = strtok(NULL, ",");
             }
-            free(deps_copy);
+            free(dep_copy);
         }
         
-        // Print called by
-        MethodDefinition* def = findMethodDefinition(current->name);
-        if (def && def->references) {
-            printf("   |      |- called by\n");
-            MethodReference* ref = def->references;
+        // Print where this method is called
+        if (method->references) {
+            const char* ref_header_prefix = is_last_method ? "    " : "│   ";
+            logr(INFO, "  %s├── called by:", ref_header_prefix);
+            
+            // Count valid references first
+            MethodReference* count_ref = method->references;
+            int valid_refs = 0;
+            while (count_ref) {
+                if (count_ref->called_in && strcmp(count_ref->called_in, source_file) != 0) {
+                    valid_refs++;
+                }
+                count_ref = count_ref->next;
+            }
+            
+            // Print references
+            int current_ref = 0;
+            MethodReference* ref = method->references;
             while (ref) {
-                printf("   |              |- %s (in %s)\n", 
-                       def->name, ref->called_in);
+                if (ref->called_in && strcmp(ref->called_in, source_file) != 0) {
+                    current_ref++;
+                    const char* ref_prefix = (current_ref == valid_refs) ? "└──" : "├──";
+                    logr(INFO, "  %s│   %s %s", ref_header_prefix, ref_prefix, ref->called_in);
+                }
                 ref = ref->next;
             }
         }
         
-        current = current->next;
+        method = method->next;
     }
 }
 
@@ -690,3 +681,4 @@ static void graphMethods(DependencyCrawler* crawler, const char* file_path, Meth
     logr(DEBUG, "[Crawler] Added %d methods from %s to dependency graph", 
          dep->method_count, file_path);
 }
+

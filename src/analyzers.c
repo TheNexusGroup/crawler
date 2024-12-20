@@ -13,7 +13,6 @@
 // Forward declarations at the top of the file
 static bool definitionFound(const char* method_name);
 static bool methodDefinition(const char* method_start, size_t len);
-static MethodDefinition* findMethodDefinition(const char* method_name);
 
 static bool isKeyword(const char* name, const LanguageGrammar* grammar) {
     if (!name || !grammar || !grammar->keywords) {
@@ -324,18 +323,25 @@ static Method* extractMatchingMethod(const char* content, regmatch_t* matches, c
 
 // Modify addMethod to check for keywords
 static void addMethod(const char* method_name, const char* file_path, const char* return_type, const char* params) {
-    if (method_def_count >= MAX_METHOD_DEFS || !method_name || !file_path) return;
+    if (method_def_count >= MAX_METHOD_DEFS || !method_name || !file_path) {
+        logr(ERROR, "[Analyzer] Invalid method addition: %s in %s", method_name, file_path);
+        return;
+    }
     
     // Skip empty method names and keywords
     if (strlen(method_name) == 0) return;
+    
+    logr(DEBUG, "[Analyzer] Adding method: %s in %s", method_name, file_path);
     
     MethodDefinition* def = &method_definitions[method_def_count];
     def->name = strdup(method_name);
     def->defined_in = strdup(file_path);
     def->return_type = return_type ? strdup(return_type) : NULL;
-    
+    logr(DEBUG, "[Analyzer] Set return type: %s", return_type);
+
     // Parse and store parameters
     if (params) {
+        logr(DEBUG, "[Analyzer] Parsing parameters: %s", params);
         def->parameters = parse_parameters(params);
         // Count parameters
         Parameter* param = def->parameters;
@@ -345,6 +351,7 @@ static void addMethod(const char* method_name, const char* file_path, const char
             param++;
         }
     } else {
+        logr(DEBUG, "[Analyzer] No parameters found");
         def->parameters = NULL;
         def->param_count = 0;
     }
@@ -354,6 +361,7 @@ static void addMethod(const char* method_name, const char* file_path, const char
     def->reference_count = 0;
     
     method_def_count++;
+    logr(DEBUG, "[Analyzer] Method added successfully: %s in %s", method_name, file_path);
 }
 
 static bool definitionFound(const char* method_name) {
@@ -432,20 +440,46 @@ static void updateMethodReferences(const char* file_path, Method* method) {
 static bool methodDefinition(const char* method_start, size_t len) {
     if (!method_start || len == 0) return false;
     
-    // Skip forward to end of method name and parameters
+    logr(DEBUG, "[Analyzer] Checking if this is a method definition: %.20s...", method_start);
+    
+    // Skip whitespace at start
+    while (len > 0 && isspace(*method_start)) {
+        method_start++;
+        len--;
+    }
+    
     const char* pos = method_start;
     const char* end = method_start + len;
     bool in_params = false;
+    bool found_params = false;
+    int brace_count = 0;
     
     while (pos < end) {
-        if (*pos == '(') in_params = true;
-        else if (*pos == ')') in_params = false;
-        else if (*pos == '{' && !in_params) return true;  // Found opening brace after parameters
-        else if (*pos == ';' && !in_params) return false; // Found semicolon - it's a declaration
+        if (*pos == '(') {
+            in_params = true;
+            found_params = true;
+        }
+        else if (*pos == ')') {
+            in_params = false;
+        }
+        else if (*pos == '{' && !in_params) {
+            brace_count++;
+            logr(DEBUG, "[Analyzer] Found opening brace, count: %d", brace_count);
+        }
+        else if (*pos == '}') {
+            brace_count--;
+        }
+        else if (*pos == ';' && !in_params && brace_count == 0) {
+            logr(DEBUG, "[Analyzer] Found semicolon - this is a declaration");
+            return false;  // Found semicolon - it's a declaration
+        }
         pos++;
     }
     
-    return false;
+    bool is_definition = found_params && brace_count > 0;
+    logr(DEBUG, "[Analyzer] Method definition check result: %d (params: %d, braces: %d)", 
+         is_definition, found_params, brace_count);
+    return is_definition;
 }
 
 // Add this helper function to store method dependencies
@@ -521,8 +555,10 @@ void collectDefinitions(const char* file_path, const char* content, const Langua
 }
 
 // Add this helper function to format method signature
-static char* formatMethodSignature(Method* method) {
+char* formatMethodSignature(Method* method) {
     char* signature = malloc(256);  // Adjust size as needed
+    if (!signature) return NULL;
+    
     if (method->return_type) {
         snprintf(signature, 256, "%s() -> %s", method->name, method->return_type);
     } else {
@@ -540,7 +576,8 @@ Method* analyzeMethod(const char* file_path, const char* content, const Language
 
     Method* head = NULL;
     Method* current = NULL;
-    Method* current_definition = NULL;  // Track current method being defined
+    Method* current_definition = NULL;
+    MethodDefinition* current_method_def = NULL;
 
     // Get compiled patterns
     const CompiledPatterns* patterns = compiledPatterns(grammar->type, LAYER_METHOD);
@@ -557,43 +594,83 @@ Method* analyzeMethod(const char* file_path, const char* content, const Language
         while (regexec(regex, pos, 5, matches, 0) == 0) {
             Method* method = extractMatchingMethod(pos, matches, grammar);
             if (method && !isKeyword(method->name, grammar)) {
+                logr(DEBUG, "[Analyzer] Processing extracted method: %s (is_definition=%d)", 
+                     method->name, methodDefinition(pos + matches[0].rm_so, 
+                                                 matches[0].rm_eo - matches[0].rm_so));
+                
                 if (methodDefinition(pos + matches[0].rm_so, matches[0].rm_eo - matches[0].rm_so)) {
                     // It's a method definition
                     method->is_definition = true;
                     method->defined_in = strdup(file_path);
                     
+                    logr(DEBUG, "[Analyzer] Adding method definition: %s to dependency chain", 
+                         method->name);
+                    
                     if (!head) {
                         head = method;
                         current = method;
+                        current_definition = method;
+                        logr(DEBUG, "[Analyzer] Created new method chain with: %s", method->name);
                     } else {
                         current->next = method;
                         current = method;
                     }
-                    current_definition = method;
-                    
-                    // Add to method definitions for global tracking
+
                     if (!definitionFound(method->name)) {
+                        logr(DEBUG, "[Analyzer] Adding method definition: %s", method->name);
                         addMethod(method->name, file_path, method->return_type, NULL);
+                        current_method_def = findMethodDefinition(method->name);
+                    } else {
+                        current_method_def = findMethodDefinition(method->name);
+                        logr(DEBUG, "[Analyzer] Added method to chain: %s", method->name);
                     }
                 } else if (current_definition) {
                     // It's a method call within current_definition
-                    addMethodDependency(current_definition, method->name);
+                    logr(DEBUG, "[Analyzer] Found method call: %s in %s", 
+                         method->name, current_definition->name);
                     
-                    // Track the reference in both directions
-                    MethodDefinition* called = findMethodDefinition(method->name);
-                    if (called) {
-                        addMethodReference(called, file_path);
-                        // Add back-reference from called method to caller
-                        addMethodReference(findMethodDefinition(current_definition->name), called->defined_in);
+                    // Add to current definition's dependencies
+                    if (!current_definition->dependencies) {
+                        current_definition->dependencies = strdup(method->name);
+                        logr(DEBUG, "[Analyzer] Created first dependency for %s: %s", 
+                             current_definition->name, method->name);
+                    } else {
+                        char* new_deps = malloc(strlen(current_definition->dependencies) + 
+                                              strlen(method->name) + 3);
+                        sprintf(new_deps, "%s, %s", current_definition->dependencies, method->name);
+                        free(current_definition->dependencies);
+                        current_definition->dependencies = new_deps;
+                        logr(DEBUG, "[Analyzer] Added dependency to %s: %s", 
+                             current_definition->name, method->name);
                     }
                     
                     freeMethod(method);
+                } else {
+                    logr(DEBUG, "[Analyzer] Skipping method: %s (no current definition)", 
+                         method->name);
+                    freeMethod(method);
                 }
+            } else if (method) {
+                logr(DEBUG, "[Analyzer] Skipping keyword or invalid method: %s", 
+                     method ? method->name : "NULL");
+                freeMethod(method);
             }
             pos += matches[0].rm_eo;
         }
     }
 
+    // Update references for all methods after we've collected all dependencies
+    Method* m = head;
+    while (m) {
+        if (m->is_definition) {
+            logr(DEBUG, "[Analyzer] Updating references for method: %s", m->name);
+            updateMethodReferences(file_path, m);
+        }
+        m = m->next;
+    }
+
+    logr(DEBUG, "[Analyzer] Completed analysis for file: %s, found %d methods", 
+         file_path, countMethods(head));
     return head;
 }
 
@@ -741,7 +818,7 @@ void freeMethod_definitions() {
 }
 
 // Add this implementation
-static MethodDefinition* findMethodDefinition(const char* method_name) {
+MethodDefinition* findMethodDefinition(const char* method_name) {
     if (!method_name) return NULL;
     
     for (size_t i = 0; i < method_def_count; i++) {

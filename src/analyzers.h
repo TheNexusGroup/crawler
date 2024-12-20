@@ -51,4 +51,8 @@ void freeMethod_references(MethodReference* refs);
 void freeMethod_definitions(void);
 int countMethods(Method* methods);
 
+// Add these declarations
+char* formatMethodSignature(Method* method);
+MethodDefinition* findMethodDefinition(const char* method_name);
+
 #endif // ANALYZERS_H
