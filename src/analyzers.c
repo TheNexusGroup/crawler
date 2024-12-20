@@ -323,6 +323,14 @@ static Method* extractMatchingMethod(const char* content, regmatch_t* matches, c
 
 // Modify addMethod to check for keywords
 static void addMethod(const char* method_name, const char* file_path, const char* return_type, const char* params) {
+    if (!method_definitions) {
+        method_definitions = calloc(MAX_METHOD_DEFS, sizeof(MethodDefinition));
+        if (!method_definitions) {
+            logr(ERROR, "[Analyzer] Failed to allocate method definitions array");
+            return;
+        }
+    }
+
     if (method_def_count >= MAX_METHOD_DEFS || !method_name || !file_path) {
         logr(ERROR, "[Analyzer] Invalid method addition: %s in %s", method_name, file_path);
         return;
