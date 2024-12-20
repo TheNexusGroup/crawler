@@ -537,7 +537,24 @@ static void addMethodDependency(MethodDefinition* def, const char* dependency) {
     }
 }
 
-// Update collectDefinitions to track dependencies
+// Add this helper function to convert MethodDefinition to Method
+static Method* createMethodFromDefinition(MethodDefinition* def) {
+    if (!def) return NULL;
+    
+    Method* method = malloc(sizeof(Method));
+    if (!method) return NULL;
+    
+    memset(method, 0, sizeof(Method));
+    method->name = def->name ? strdup(def->name) : NULL;
+    method->return_type = def->return_type ? strdup(def->return_type) : NULL;
+    method->defined_in = def->defined_in ? strdup(def->defined_in) : NULL;
+    method->dependencies = def->dependencies ? strdup(def->dependencies) : NULL;
+    method->param_count = def->param_count;
+    
+    return method;
+}
+
+// Update the relevant part of collectDefinitions
 void collectDefinitions(const char* file_path, const char* content, const LanguageGrammar* grammar) {
     if (!method_definitions) {
         method_definitions = calloc(MAX_METHOD_DEFS, sizeof(MethodDefinition));
@@ -548,8 +565,8 @@ void collectDefinitions(const char* file_path, const char* content, const Langua
     if (!patterns) return;
 
     MethodDefinition* current_method = NULL;
-    int brace_count = 0;
-    const char* method_start = NULL;
+    const char* method_body_start = NULL;
+    const char* method_body_end = NULL;
 
     // First pass: collect all method definitions
     for (size_t i = 0; i < patterns->pattern_count; i++) {
@@ -565,8 +582,45 @@ void collectDefinitions(const char* file_path, const char* content, const Langua
                     if (!definitionFound(method->name)) {
                         addMethod(method->name, file_path, method->return_type, NULL);
                     }
-                    current_method = findMethodDefinition(method->name);
-                    method_start = pos + matches[0].rm_so;
+                    
+                    // Find method body bounds
+                    const char* body_pos = pos + matches[0].rm_so;
+                    while (*body_pos && *body_pos != '{') body_pos++;
+                    if (*body_pos == '{') {
+                        method_body_start = body_pos;
+                        int brace_count = 1;
+                        body_pos++;
+                        
+                        while (*body_pos && brace_count > 0) {
+                            if (*body_pos == '{') brace_count++;
+                            if (*body_pos == '}') brace_count--;
+                            body_pos++;
+                        }
+                        method_body_end = body_pos;
+                        
+                        // Now scan for method calls within just this method's body
+                        current_method = findMethodDefinition(method->name);
+                        if (current_method) {
+                            for (size_t j = 0; j < patterns->pattern_count; j++) {
+                                regex_t* call_regex = &patterns->compiled_patterns[j];
+                                const char* call_pos = method_body_start;
+                                regmatch_t call_matches[5];
+                                
+                                while (call_pos < method_body_end && 
+                                       regexec(call_regex, call_pos, 5, call_matches, 0) == 0) {
+                                    Method* called = extractMatchingMethod(call_pos, call_matches, grammar);
+                                    if (called && !isKeyword(called->name, grammar) &&
+                                        !methodDefinition(call_pos + call_matches[0].rm_so, 
+                                                        call_matches[0].rm_eo - call_matches[0].rm_so)) {
+                                        // Add dependency to current method only
+                                        addMethodDependency(current_method, called->name);
+                                    }
+                                    freeMethod(called);
+                                    call_pos += call_matches[0].rm_eo;
+                                }
+                            }
+                        }
+                    }
                 }
             }
             freeMethod(method);
@@ -574,55 +628,14 @@ void collectDefinitions(const char* file_path, const char* content, const Langua
         }
     }
 
-    // Second pass: collect method calls within each definition
+    // Second pass: update references based on dependencies
     for (size_t i = 0; i < method_def_count; i++) {
         current_method = &method_definitions[i];
         if (strcmp(current_method->defined_in, file_path) != 0) continue;
-
-        // Find the method's bounds in the source
-        const char* method_start = strstr(content, current_method->name);
-        if (!method_start) continue;
-
-        // Find opening brace
-        const char* pos = method_start;
-        while (*pos && *pos != '{') pos++;
-        if (!*pos) continue;
-
-        // Find closing brace (matching)
-        const char* end = pos + 1;
-        brace_count = 1;
-        while (*end && brace_count > 0) {
-            if (*end == '{') brace_count++;
-            if (*end == '}') brace_count--;
-            end++;
-        }
-
-        // Now look for method calls within these bounds
-        for (size_t j = 0; j < patterns->pattern_count; j++) {
-            regex_t* regex = &patterns->compiled_patterns[j];
-            const char* call_pos = pos;
-            regmatch_t matches[5];
-
-            while (call_pos < end && regexec(regex, call_pos, 5, matches, 0) == 0) {
-                Method* called = extractMatchingMethod(call_pos, matches, grammar);
-                if (called && !isKeyword(called->name, grammar) && 
-                    !methodDefinition(call_pos + matches[0].rm_so, matches[0].rm_eo - matches[0].rm_so)) {
-                    
-                    // Add dependency to current method
-                    addMethodDependency(current_method, called->name);
-                    
-                    // Add reference from called method back to current method
-                    MethodDefinition* called_def = findMethodDefinition(called->name);
-                    if (called_def) {
-                        addMethodReference(called_def, current_method->name);
-                        logr(DEBUG, "[Analyzer] Added reference: %s is called by %s", 
-                             called->name, current_method->name);
-                    }
-                }
-                freeMethod(called);
-                call_pos += matches[0].rm_eo;
-            }
-        }
+        
+        Method* temp_method = createMethodFromDefinition(current_method);
+        updateMethodReferences(file_path, temp_method);
+        freeMethod(temp_method);
     }
 }
 
