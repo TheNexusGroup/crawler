@@ -15,7 +15,7 @@ static void processLayer(DependencyCrawler* crawler, const char* filepath,
                         const char* content, const LanguageGrammar* grammar);
 static void graphMethods(DependencyCrawler* crawler, const char* file_path, 
                                 Method* methods);
-static void printMethods(Method* method, const char* source_file);
+static void printMethods(Method* method);//, const char* source_file);
 
 DependencyCrawler* create_crawler(char** directories, int directory_count, AnalysisConfig* config) {
     logr(INFO, "[Crawler] Creating new crawler instance with %d directories", directory_count);
@@ -382,13 +382,13 @@ void crawlDeps(DependencyCrawler* crawler) {
 }
 
 // In printDependencies function
-static void printMethods(Method* method, const char* source_file) {
+static void printMethods(Method* method) {
     while (method) {
         bool is_last_method = (method->next == NULL);
         const char* method_prefix = is_last_method ? "└──" : "├──";
         
         char* signature = formatMethodSignature(method);
-        logr(INFO, "  %s %s", method_prefix, signature);
+        logr(INFO, "  %s %s -> %s", method_prefix, signature, method->return_type);
         free(signature);
         
         // Print methods this method calls
@@ -545,7 +545,7 @@ void printDependencies(DependencyCrawler* crawler) {
             while (current) {
                 if (current->level == LAYER_METHOD && current->source && 
                     strcmp(current->source, processed_files[i]) == 0) {
-                    printMethods(current->methods, current->source);
+                    printMethods(current->methods);//, current->source);
                     method_count++;
                 }
                 current = current->next;
@@ -653,29 +653,47 @@ static void graphMethods(DependencyCrawler* crawler, const char* file_path, Meth
     
     logr(VERBOSE, "[Crawler] Adding methods to dependency graph from %s", file_path);
     
-    // Create new dependency node
-    Dependency* dep = malloc(sizeof(Dependency));
-    if (!dep) {
-        logr(ERROR, "[Crawler] Failed to allocate memory for dependency");
-        return;
-    }
-    
-    memset(dep, 0, sizeof(Dependency));
-    dep->source = strdup(file_path);
-    dep->level = LAYER_METHOD;
-    dep->methods = methods;  // Take ownership of the methods list
-    dep->method_count = countMethods(methods);
-    dep->next = NULL;
-    
-    // Add to graph
-    if (!crawler->dependency_graph) {
-        crawler->dependency_graph = dep;
-    } else {
+    Method* current = methods;
+    while (current) {
+        // Create new dependency node for each method
+        Dependency* dep = malloc(sizeof(Dependency));
+        if (!dep) {
+            logr(ERROR, "[Crawler] Failed to allocate memory for dependency");
+            return;
+        }
+        
+        memset(dep, 0, sizeof(Dependency));
+        dep->source = strdup(file_path);
+        dep->level = LAYER_METHOD;
+        
+        // Create a new Method structure just for this method
+        Method* single_method = malloc(sizeof(Method));
+        if (!single_method) {
+            free(dep->source);
+            free(dep);
+            return;
+        }
+        
+        // Copy just this method's data
+        memset(single_method, 0, sizeof(Method));
+        single_method->name = current->name ? strdup(current->name) : NULL;
+        single_method->return_type = current->return_type ? strdup(current->return_type) : NULL;
+        single_method->dependencies = current->dependencies ? strdup(current->dependencies) : NULL;
+        single_method->defined_in = current->defined_in ? strdup(current->defined_in) : NULL;
+        single_method->references = current->references; // Keep reference to original references
+        single_method->next = NULL; // Important: break the chain
+        
+        dep->methods = single_method;
+        dep->method_count = 1; // Each dependency now has exactly one method
+        
+        // Add to graph
         dep->next = crawler->dependency_graph;
         crawler->dependency_graph = dep;
+        
+        logr(DEBUG, "[Crawler] Added method %s from %s to dependency graph", 
+             current->name ? current->name : "unknown", file_path);
+             
+        current = current->next;
     }
-    
-    logr(DEBUG, "[Crawler] Added %d methods from %s to dependency graph", 
-         dep->method_count, file_path);
 }
 

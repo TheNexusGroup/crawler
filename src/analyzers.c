@@ -251,12 +251,11 @@ static void addMethodReference(MethodDefinition* method, const char* called_in) 
     }
 }
 
-
 // Add the implementation
 static bool isType(const char* word, const LanguageGrammar* grammar) {
     if (!word || !grammar || !grammar->types) return false;
     
-    logr(DEBUG, "[Analyzer] Checking if '%s' is a type (total types: %zu)", 
+    logr(VERBOSE, "[Analyzer] Checking if '%s' is a type (total types: %zu)", 
          word, grammar->type_count);
     
     for (size_t i = 0; i < grammar->type_count; i++) {
@@ -272,7 +271,7 @@ static bool isType(const char* word, const LanguageGrammar* grammar) {
 static Method* extractMatchingMethod(const char* content, regmatch_t* matches, const LanguageGrammar* grammar) {
     if (!content || !matches || !grammar) return NULL;
 
-    logr(DEBUG, "[Analyzer] Extracting method from match");
+    logr(VERBOSE, "[Analyzer] Extracting method from match");
     
     // Log the matched content
     size_t decl_len = matches[1].rm_eo - matches[1].rm_so;
@@ -309,10 +308,11 @@ static Method* extractMatchingMethod(const char* content, regmatch_t* matches, c
             method->return_type = strdup(word);
             logr(DEBUG, "[Analyzer] Set return type: '%s'", word);
         } 
+
         // Check if it's the method name
         else if (!method->name) {
             method->name = strdup(word);
-            logr(DEBUG, "[Analyzer] Set method name: '%s'", word);
+            logr(VERBOSE, "[Analyzer] Set method name: '%s'", word);
         }
         
         word = strtok(NULL, " \t\n(");
@@ -334,7 +334,7 @@ static Method* extractMatchingMethod(const char* content, regmatch_t* matches, c
 }
 
 // Modify addMethod to check for keywords
-static void addMethod(const char* method_name, const char* file_path, const char* return_type, const char* params) {
+static void addMethod(const char* method_name, const char* file_path, const char* return_type) {
     if (!method_definitions) {
         method_definitions = calloc(MAX_METHOD_DEFS, sizeof(MethodDefinition));
         if (!method_definitions) {
@@ -349,10 +349,13 @@ static void addMethod(const char* method_name, const char* file_path, const char
     for (size_t i = 0; i < method_def_count; i++) {
         if (strcmp(method_definitions[i].name, method_name) == 0) {
             // Method already exists, don't add it again
+            logr(WARN, "[Analyzer] Method '%s' already exists", method_name);
             return;
         }
     }
     
+    logr(WARN, "[Analyzer] Creating method '%s' definition", method_name);
+
     MethodDefinition* def = &method_definitions[method_def_count];
     def->name = strdup(method_name);
     def->defined_in = strdup(file_path);
@@ -371,11 +374,11 @@ static bool definitionFound(const char* method_name) {
         logr(VERBOSE, "[Analyzer] Comparing with existing method: '%s'", 
              method_definitions[i].name);
         if (strcmp(method_definitions[i].name, method_name) == 0) {
-            logr(DEBUG, "[Analyzer] Method '%s' already exists", method_name);
+            logr(WARN, "[Analyzer] Method '%s' already exists", method_name);
             return true;
         }
     }
-    logr(DEBUG, "[Analyzer] Method '%s' is new", method_name);
+    logr(WARN, "[Analyzer] Method '%s' is new", method_name);
     return false;
 }
 
@@ -440,7 +443,7 @@ static void updateMethodReferences(const char* file_path, Method* method) {
 static bool methodDefinition(const char* method_start, size_t len) {
     if (!method_start || len == 0) return false;
     
-    logr(DEBUG, "[Analyzer] Checking if this is a method definition: %.20s...", method_start);
+    logr(VERBOSE, "[Analyzer] Checking if this is a method definition: %.20s...", method_start);
     
     // Skip whitespace at start
     while (len > 0 && isspace(*method_start)) {
@@ -483,23 +486,40 @@ static bool methodDefinition(const char* method_start, size_t len) {
 }
 
 // Add this helper function to store method dependencies
-static void addMethodDependency(MethodDefinition* def, const char* dependency) {
-    if (!def || !dependency) return;
+static void addMethodDependency(MethodDefinition* method, const char* dep_name) {
+    if (!method || !dep_name) return;
     
-    // Check if dependency already exists
-    MethodDependency* curr = def->dependencies;
-    while (curr) {
-        if (strcmp(curr->name, dependency) == 0) return;
-        curr = curr->next;
+    // Create new dependency
+    MethodDependency* dep = malloc(sizeof(MethodDependency));
+    if (!dep) return;
+    
+    dep->name = strdup(dep_name);
+    dep->next = NULL;
+    
+    // Add to list, checking for duplicates
+    if (!method->dependencies) {
+        method->dependencies = dep;
+    } else {
+        // Check for duplicate
+        MethodDependency* curr = method->dependencies;
+        bool duplicate = false;
+        
+        while (curr) {
+            if (strcmp(curr->name, dep_name) == 0) {
+                duplicate = true;
+                free(dep->name);
+                free(dep);
+                break;
+            }
+            if (!curr->next) break;
+            curr = curr->next;
+        }
+        
+        // Add if not duplicate
+        if (!duplicate) {
+            curr->next = dep;
+        }
     }
-    
-    // Add new dependency
-    MethodDependency* new_dep = malloc(sizeof(MethodDependency));
-    if (!new_dep) return;
-    
-    new_dep->name = strdup(dependency);
-    new_dep->next = def->dependencies;
-    def->dependencies = new_dep;
 }
 
 // Update the cleanup function
@@ -562,29 +582,25 @@ static const char* findMethodBody(const char* start) {
     return start;
 }
 
-static void scanMethodBodyForCalls(const char* body_start, MethodDefinition* method, const LanguageGrammar* grammar) {
+static void scanMethodBodyForCalls(const char* body_start, MethodDefinition* method, 
+                                 const LanguageGrammar* grammar) {
     if (!body_start || !method || !grammar) return;
     
-    // Clear existing dependencies first
+    // Clear existing dependencies before scanning
     freeMethodDependencies(method->dependencies);
     method->dependencies = NULL;
-    
-    // Clear existing references
-    freeMethod_references(method->references);
-    method->references = NULL;
     
     const CompiledPatterns* patterns = compiledPatterns(grammar->type, LAYER_METHOD);
     if (!patterns) return;
     
-    // Track unique dependencies to avoid duplicates
-    size_t unique_count = 0;
     char** unique_deps = NULL;
+    size_t unique_count = 0;
     
-    // Scan for method calls within the body
+    const char* pos = body_start;
+    
     for (size_t i = 0; i < patterns->pattern_count; i++) {
         regex_t* regex = &patterns->compiled_patterns[i];
-        const char* pos = body_start;
-        regmatch_t matches[2];
+        regmatch_t matches[2];  // We need 2 slots: full match and the method name
         
         while (regexec(regex, pos, 2, matches, 0) == 0) {
             size_t len = matches[1].rm_eo - matches[1].rm_so;
@@ -594,11 +610,11 @@ static void scanMethodBodyForCalls(const char* body_start, MethodDefinition* met
             strncpy(called_method, pos + matches[1].rm_so, len);
             called_method[len] = '\0';
             
-            // Don't add if it's a keyword or the method itself
+            // Only add if it's not a keyword and not the method itself
             if (!isKeyword(called_method, grammar) && 
                 strcmp(called_method, method->name) != 0) {
                 
-                // Check if we've already added this dependency
+                // Check for duplicates
                 bool already_added = false;
                 for (size_t j = 0; j < unique_count; j++) {
                     if (strcmp(unique_deps[j], called_method) == 0) {
@@ -608,25 +624,13 @@ static void scanMethodBodyForCalls(const char* body_start, MethodDefinition* met
                 }
                 
                 if (!already_added) {
-                    // Add to unique deps
                     char** new_deps = realloc(unique_deps, (unique_count + 1) * sizeof(char*));
                     if (new_deps) {
                         unique_deps = new_deps;
-                        unique_deps[unique_count++] = strdup(called_method);
+                        unique_deps[unique_count] = strdup(called_method);
+                        unique_count++;
                         
-                        // Add dependency
-                        MethodDependency* dep = malloc(sizeof(MethodDependency));
-                        if (dep) {
-                            dep->name = strdup(called_method);
-                            dep->next = method->dependencies;
-                            method->dependencies = dep;
-                            
-                            // Update the called method's references
-                            MethodDefinition* called_def = findMethodDefinition(called_method);
-                            if (called_def) {
-                                addMethodReference(called_def, method->name);
-                            }
-                        }
+                        addMethodDependency(method, called_method);
                     }
                 }
             }
@@ -635,7 +639,7 @@ static void scanMethodBodyForCalls(const char* body_start, MethodDefinition* met
         }
     }
     
-    // Clean up unique deps tracking
+    // Clean up
     for (size_t i = 0; i < unique_count; i++) {
         free(unique_deps[i]);
     }
@@ -653,9 +657,7 @@ void collectDefinitions(const char* file_path, const char* content, const Langua
     if (!patterns) return;
 
     MethodDefinition* current_method = NULL;
-    const char* method_body_start = NULL;
-    const char* method_body_end = NULL;
-
+    
     // First pass: collect all method definitions
     for (size_t i = 0; i < patterns->pattern_count; i++) {
         regex_t* regex = &patterns->compiled_patterns[i];
@@ -668,7 +670,7 @@ void collectDefinitions(const char* file_path, const char* content, const Langua
                 if (methodDefinition(pos + matches[0].rm_so, matches[0].rm_eo - matches[0].rm_so)) {
                     // Add or update method definition
                     if (!definitionFound(method->name)) {
-                        addMethod(method->name, file_path, method->return_type, NULL);
+                        addMethod(method->name, file_path, method->return_type);
                     }
                     
                     // Get the method definition and clear its existing dependencies/references
@@ -710,9 +712,9 @@ char* formatMethodSignature(Method* method) {
     if (!signature) return NULL;
     
     if (method->return_type) {
-        snprintf(signature, 256, "%s() -> %s", method->name, method->return_type);
+        snprintf(signature, 256, "%s(%p) -> %s", method->name, method->parameters, method->return_type);
     } else {
-        snprintf(signature, 256, "%s()", method->name);
+        snprintf(signature, 256, "%s(%p)", method->name, method->parameters);
     }
     return signature;
 }
@@ -729,7 +731,7 @@ Method* analyzeMethod(const char* file_path, const char* content, const Language
         return NULL;
     }
 
-    // First pass: find all method definitions
+    // First pass: collect all method definitions
     for (size_t i = 0; i < patterns->pattern_count; i++) {
         regex_t* regex = &patterns->compiled_patterns[i];
         const char* pos = content;
@@ -737,12 +739,13 @@ Method* analyzeMethod(const char* file_path, const char* content, const Language
 
         while (regexec(regex, pos, 5, matches, 0) == 0) {
             Method* method = extractMatchingMethod(pos, matches, grammar);
-            if (method && !isKeyword(method->name, grammar)) {
+            if (!method) {
+                pos += matches[0].rm_eo;
+                continue;
+            }
+
+            if (!isKeyword(method->name, grammar)) {
                 if (methodDefinition(pos + matches[0].rm_so, matches[0].rm_eo - matches[0].rm_so)) {
-                    // It's a method definition
-                    method->is_definition = true;
-                    method->defined_in = strdup(file_path);
-                    
                     // Add to linked list
                     if (!head) {
                         head = method;
@@ -751,43 +754,31 @@ Method* analyzeMethod(const char* file_path, const char* content, const Language
                         current->next = method;
                         current = method;
                     }
-                    
-                    // Add or get method definition
+
+                    // Register method definition
                     if (!definitionFound(method->name)) {
-                        addMethod(method->name, file_path, method->return_type, NULL);
+                        addMethod(method->name, file_path, method->return_type);
                     }
-                    MethodDefinition* def = findMethodDefinition(method->name);
                     
-                    // Find method body and scan for calls
-                    const char* body_start = findMethodBody(pos + matches[0].rm_so);
-                    if (body_start && def) {
-                        scanMethodBodyForCalls(body_start, def, grammar);
-                    }
-                } else {
-                    // It's a method call - find the containing method definition
-                    MethodDefinition* called_def = findMethodDefinition(method->name);
-                    MethodDefinition* containing_def = NULL;
-                    
-                    // Find which method definition contains this call
-                    Method* temp = head;
-                    while (temp) {
-                        if (pos >= temp->body_start && pos <= temp->body_end) {
-                            containing_def = findMethodDefinition(temp->name);
-                            break;
+                    // Get the method definition and clear its existing dependencies/references
+                    MethodDefinition* current_def = findMethodDefinition(method->name);
+                    if (current_def) {
+                        // Clear existing dependencies and references
+                        freeMethodDependencies(current_def->dependencies);
+                        current_def->dependencies = NULL;
+                        
+                        // Find and process method body
+                        const char* body_start = findMethodBody(pos + matches[0].rm_so);
+                        if (body_start) {
+                            scanMethodBodyForCalls(body_start, current_def, grammar);
                         }
-                        temp = temp->next;
                     }
                     
-                    // Add reference from called method back to containing method
-                    if (called_def && containing_def) {
-                        addMethodReference(called_def, containing_def->name);
-                        addMethodDependency(containing_def, method->name);
-                    }
-                    freeMethod(method);
+                    pos += matches[0].rm_eo;
+                    continue;
                 }
-            } else {
-                freeMethod(method);
             }
+            freeMethod(method);
             pos += matches[0].rm_eo;
         }
     }
