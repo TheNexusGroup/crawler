@@ -13,11 +13,9 @@ static void processFile(DependencyCrawler* crawler, const char* file_path);
 static void crawlDir(DependencyCrawler* crawler, const char* path);
 static void processLayer(DependencyCrawler* crawler, const char* filepath, 
                         const char* content, const LanguageGrammar* grammar);
-static void graphMethods(DependencyCrawler* crawler, const char* file_path, 
-                                Method* methods);
-static void printMethods(Method* method);//, const char* source_file);
 
-DependencyCrawler* create_crawler(char** directories, int directory_count, AnalysisConfig* config) {
+
+DependencyCrawler* createCrawler(char** directories, int directory_count, AnalysisConfig* config) {
     logr(INFO, "[Crawler] Creating new crawler instance with %d directories", directory_count);
     
     DependencyCrawler* crawler = malloc(sizeof(DependencyCrawler));
@@ -363,215 +361,6 @@ static void crawlDir(DependencyCrawler* crawler, const char* path) {
     }
 }
 
-// Main crawling function
-void crawlDeps(DependencyCrawler* crawler) {
-    logr(INFO, "[Crawler] Starting dependency crawl for %d directories", crawler->directory_count);
-    if (!crawler || !crawler->root_directories) {
-        logr(ERROR, "[Crawler] Invalid crawler instance");
-        return;
-    }
-    
-    for (int i = 0; i < crawler->directory_count; i++) {
-        if (!crawler->root_directories[i]) {
-            logr(ERROR, "[Crawler] Invalid directory at index %d", i);
-            continue;
-        }
-        logr(DEBUG, "[Crawler] Processing directory %d: %s", i, crawler->root_directories[i]);
-        crawlDir(crawler, crawler->root_directories[i]);
-    }
-}
-
-// In printDependencies function
-static void printMethods(Method* method) {
-    while (method) {
-        bool is_last_method = (method->next == NULL);
-        const char* method_prefix = is_last_method ? "└──" : "├──";
-        
-        char* signature = formatMethodSignature(method);
-        logr(INFO, "  %s %s -> %s", method_prefix, signature, method->return_type);
-        free(signature);
-        
-        // Print methods this method calls
-        MethodDefinition* def = findMethodDefinition(method->name);
-        if (def && def->dependencies) {
-            const char* dep_header_prefix = is_last_method ? "    " : "│   ";
-            logr(INFO, "  %s ├── calls:", dep_header_prefix);
-            
-            MethodDependency* dep = def->dependencies;
-            
-            while (dep) {
-                const char* dep_prefix = (dep->next == NULL) ? "└──" : "├──";
-                logr(INFO, "  %s │     %s %s", dep_header_prefix, dep_prefix, dep->name);
-                dep = dep->next;
-            }
-        }
-        
-        // Print methods that call this method
-        if (def && def->references) {
-            const char* ref_header_prefix = is_last_method ? "    " : "│   ";
-            logr(INFO, "  %s └── called by:", ref_header_prefix);
-            
-            MethodReference* ref = def->references;
-            int ref_count = 0;
-            MethodReference* count_ref = ref;
-            
-            // Count references first
-            while (count_ref) {
-                if (count_ref->called_in) ref_count++;
-                count_ref = count_ref->next;
-            }
-            
-            // Print references
-            int current_ref = 0;
-            while (ref) {
-                if (ref->called_in) {
-                    current_ref++;
-                    const char* ref_prefix = (current_ref == ref_count) ? "└──" : "├──";
-                    logr(INFO, "  %s       %s %s", ref_header_prefix, ref_prefix, ref->called_in);
-                }
-                ref = ref->next;
-            }
-        }
-        
-        method = method->next;
-    }
-}
-
-// Print dependency information
-void printDependencies(DependencyCrawler* crawler) {
-    if (!crawler->dependency_graph) {
-        logr(INFO, "[Crawler] No dependencies found.");
-        return;
-    }
-
-    int module_count = 0;
-    int struct_count = 0;
-    int method_count = 0;
-
-    logr(INFO, "[Crawler] Dependencies by Layer");
-    logr(INFO, "==========================\n");
-    if (crawler->analysis_config.analyzeModules) {
-        // Module Dependencies
-        logr(INFO, "Module Dependencies:");
-        logr(INFO, "-----------------");
-        char* current_file = NULL;
-        Dependency* dep = crawler->dependency_graph;
-        while (dep) {
-            if (!current_file || strcmp(current_file, dep->source) != 0) {
-                if (current_file) free(current_file);
-                current_file = strdup(dep->source);
-                logr(INFO, "  %s", current_file);
-            }
-            
-            // Check if this is the last dependency for this source file
-            Dependency* next_with_same_source = dep->next;
-            while (next_with_same_source && strcmp(next_with_same_source->source, current_file) != 0) {
-                next_with_same_source = next_with_same_source->next;
-            }
-            
-            // Use └── for last item, ├── for others
-            const char* prefix = next_with_same_source ? "├──" : "└──";
-            logr(INFO, "    %s %s", prefix, dep->target);
-            module_count++;
-        
-            dep = dep->next;
-        }
-        logr(INFO, "Total Module Dependencies: %d\n", module_count);
-        free(current_file);
-    }
-    
-    if (crawler->analysis_config.analyze_structures) {
-        // Structure Dependencies
-        logr(INFO, "Structure Dependencies:");
-        logr(INFO, "--------------------");
-        size_t def_count;
-        size_t struct_count = 0;
-        StructureDefinition* defs = get_structure_definitions(&def_count);
-    
-        for (size_t i = 0; i < def_count; i++) {
-            StructureDefinition* def = &defs[i];
-            logr(INFO, "  %s %s (defined in %s)", 
-                def->type,
-                def->name,
-                def->defined_in);
-            if (def->reference_count > 0) {
-                logr(INFO, "    Referenced in:");
-                for (int j = 0; j < def->reference_count; j++) {
-                    // Use ├── for all but the last reference, └── for the last one
-                    const char* prefix = (j == def->reference_count - 1) ? "└──" : "├──";
-                    logr(INFO, "      %s %s", prefix, def->referenced_in[j]);
-                }
-                struct_count++;
-            }
-        }
-        logr(INFO, "Total Structure Dependencies: %zu\n", struct_count);
-    }
-
-    if (crawler->analysis_config.analyzeMethods) {
-        logr(INFO, "Method Dependencies:");
-        logr(INFO, "-----------------");
-        
-        // Create a hash table or sorted list to track unique files
-        char** processed_files = NULL;
-        size_t file_count = 0;
-        
-        // First pass - collect unique files
-        Dependency* current = crawler->dependency_graph;
-        while (current) {
-            if (current->level == LAYER_METHOD && current->source) {
-                bool found = false;
-                for (size_t i = 0; i < file_count; i++) {
-                    if (strcmp(processed_files[i], current->source) == 0) {
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    processed_files = realloc(processed_files, 
-                                           (file_count + 1) * sizeof(char*));
-                    processed_files[file_count] = strdup(current->source);
-                    file_count++;
-                }
-            }
-            current = current->next;
-        }
-        
-        // Second pass - print method dependencies for each unique file
-        for (size_t i = 0; i < file_count; i++) {
-            logr(INFO, "Method Dependencies for %s:", processed_files[i]);
-            logr(INFO, "-----------------------------");
-            
-            Dependency* current = crawler->dependency_graph;
-            while (current) {
-                if (current->level == LAYER_METHOD && current->source && 
-                    strcmp(current->source, processed_files[i]) == 0) {
-                    printMethods(current->methods);//, current->source);
-                    method_count++;
-                }
-                current = current->next;
-            }
-            logr(INFO, "\nTotal Method Dependencies for %s: %d\n", processed_files[i], method_count);
-            free(processed_files[i]);
-        }
-        free(processed_files);
-        logr(INFO, "\nTotal Method Dependencies: %d\n", method_count);
-    }
-
-    logr(INFO, "\nTotal Dependencies: %zu", module_count + struct_count + method_count);
-}
-
-// Export dependencies in various formats
-void exportDeps(DependencyCrawler* crawler, const char* output_format) {
-    if (strcmp(output_format, "json") == 0) {
-        // TODO: Implement JSON export
-        logr(INFO, "[Crawler] JSON export not yet implemented");
-    } else if (strcmp(output_format, "graphviz") == 0) {
-        // TODO: Implement GraphViz export
-        logr(INFO, "[Crawler] GraphViz export not yet implemented");
-    } else {
-        printDependencies(crawler);  // Default to terminal output
-    }
-}
 
 // Clean up resources
 void freeCrawler(DependencyCrawler* crawler) {
@@ -647,53 +436,85 @@ void freeCrawler(DependencyCrawler* crawler) {
     logr(VERBOSE, "[Crawler] cleanup complete");
 }
 
-// Modify the dependency graph creation
-static void graphMethods(DependencyCrawler* crawler, const char* file_path, Method* methods) {
-    if (!crawler || !file_path || !methods) return;
-    
-    logr(VERBOSE, "[Crawler] Adding methods to dependency graph from %s", file_path);
-    
-    Method* current = methods;
-    while (current) {
-        // Create new dependency node for each method
-        Dependency* dep = malloc(sizeof(Dependency));
-        if (!dep) {
-            logr(ERROR, "[Crawler] Failed to allocate memory for dependency");
-            return;
-        }
-        
-        memset(dep, 0, sizeof(Dependency));
-        dep->source = strdup(file_path);
-        dep->level = LAYER_METHOD;
-        
-        // Create a new Method structure just for this method
-        Method* single_method = malloc(sizeof(Method));
-        if (!single_method) {
-            free(dep->source);
-            free(dep);
-            return;
-        }
-        
-        // Copy just this method's data
-        memset(single_method, 0, sizeof(Method));
-        single_method->name = current->name ? strdup(current->name) : NULL;
-        single_method->return_type = current->return_type ? strdup(current->return_type) : NULL;
-        single_method->dependencies = current->dependencies ? strdup(current->dependencies) : NULL;
-        single_method->defined_in = current->defined_in ? strdup(current->defined_in) : NULL;
-        single_method->references = current->references; // Keep reference to original references
-        single_method->next = NULL; // Important: break the chain
-        
-        dep->methods = single_method;
-        dep->method_count = 1; // Each dependency now has exactly one method
-        
-        // Add to graph
-        dep->next = crawler->dependency_graph;
-        crawler->dependency_graph = dep;
-        
-        logr(DEBUG, "[Crawler] Added method %s from %s to dependency graph", 
-             current->name ? current->name : "unknown", file_path);
-             
-        current = current->next;
+// Analyze a file based on the given configuration
+ExtractedDependency* analyzeFile(const char* file_path, AnalysisConfig* config) {
+    if (!file_path || !config) return NULL;
+
+    // Read file content
+    FILE* file = fopen(file_path, "r");
+    if (!file) return NULL;
+
+    // Get file size
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    rewind(file);
+
+    // Allocate memory for content
+    char* content = malloc(size + 1);
+    if (!content) {
+        fclose(file);
+        return NULL;
     }
+
+    // Read file content
+    size_t read_size = fread(content, 1, size, file);
+    content[read_size] = '\0';
+    fclose(file);
+
+    // Create dependency structure
+    ExtractedDependency* dep = malloc(sizeof(ExtractedDependency));
+    if (!dep) {
+        free(content);
+        return NULL;
+    }
+    
+    // Initialize dependency
+    dep->file_path = strdup(file_path);
+    dep->language = languageType(file_path);
+    
+    // Get grammar
+    const LanguageGrammar* grammar = languageGrammars(dep->language);
+    if (grammar) {
+        // Update this line to include file_path
+        dep->structures = analyze_structure(content, file_path, grammar);
+        dep->methods = analyzeMethod(file_path, content, grammar);
+        dep->modules = analyzeModule(content, grammar);
+    }
+
+    free(content);
+    return dep;
 }
 
+// Export the dependency graph to a specific format
+void exportGraph(DependencyGraph* graph, const char* format, const char* output_path) {
+    if (!graph || !format || !output_path) return;
+
+    FILE* output = fopen(output_path, "w");
+    if (!output) return;
+
+    if (strcmp(format, "dot") == 0) {
+        // Export as GraphViz DOT format
+        fprintf(output, "digraph Dependencies {\n");
+        for (int i = 0; i < graph->relationship_count; i++) {
+            Relationship* rel = graph->relationships[i];
+            fprintf(output, "  \"%s\" -> \"%s\" [label=\"%s\"];\n",
+                    rel->from, rel->to, rel->relationship_type);
+        }
+        fprintf(output, "}\n");
+    } else if (strcmp(format, "json") == 0) {
+        // Export as JSON format
+        fprintf(output, "{\n  \"relationships\": [\n");
+        for (int i = 0; i < graph->relationship_count; i++) {
+            Relationship* rel = graph->relationships[i];
+            fprintf(output, "    {\n");
+            fprintf(output, "      \"from\": \"%s\",\n", rel->from);
+            fprintf(output, "      \"to\": \"%s\",\n", rel->to);
+            fprintf(output, "      \"type\": \"%s\",\n", rel->relationship_type);
+            fprintf(output, "      \"layer\": %d\n", rel->layer);
+            fprintf(output, "    }%s\n", i < graph->relationship_count - 1 ? "," : "");
+        }
+        fprintf(output, "  ]\n}\n");
+    }
+
+    fclose(output);
+}

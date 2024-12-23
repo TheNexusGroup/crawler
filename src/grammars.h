@@ -2,7 +2,17 @@
 #define GRAMMARS_H
 
 #include "syntaxes.h"
+#include "dependency.h"
+#include "structure.h"
+#include "method.h"
 
+// Enhanced Language Parser interface
+typedef struct {
+    LanguageType type;
+    ExtractedDependency* (*analyzeModule)(const char* content);
+    Structure* (*analyze_structure)(const char* content);
+    Method* (*analyzeMethod)(const char* content);
+} LanguageParser;
 
 typedef struct {
     LanguageType type;

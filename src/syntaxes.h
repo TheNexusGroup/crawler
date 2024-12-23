@@ -29,105 +29,12 @@ typedef enum {
     LANG_RUBY = 7        // Index 7
 } LanguageType;
 
-// Language type functions
-LanguageType languageType(const char* filename);
-const char* languageName(LanguageType type);
-
 // Layer definitions for granular analysis
 typedef enum {
     LAYER_MODULE,    // First layer: modules, files, packages
     LAYER_STRUCT,    // Second layer: classes, structs, traits
     LAYER_METHOD     // Third layer: methods, functions, parameters
 } AnalysisLayer;
-
-// Parameter structure
-typedef struct {
-    char* name;
-    char* type;
-    char* default_value;
-} Parameter;
-
-// Forward declarations first
-typedef struct Method Method;
-typedef struct Structure Structure;
-typedef struct ExtractedDependency ExtractedDependency;
-typedef struct Dependency Dependency;
-
-// Enhanced dependency features
-typedef struct {
-    // First layer features (existing)
-    int is_pub_mod;
-    int is_conditional;
-    int is_system_header;
-    int is_local_header;
-    
-    // Second layer features
-    int is_public_struct;
-    int has_generic_params;
-    int implements_trait;
-    int is_abstract;
-    
-    // Third layer features
-    int is_public_method;
-    int is_static;
-    int is_virtual;
-    int has_default_impl;
-} DependencyFeatures;
-
-// Then the full struct definitions
-typedef struct Method {
-    char* name;
-    char* prefix;
-    char* return_type;
-    Parameter* parameters;
-    int param_count;
-    char* dependencies;
-    char* defined_in;
-    struct MethodReference* references;
-    int reference_count;
-    struct Method* next;      // Sibling methods
-    struct Method* children;  // Child methods (e.g., class methods)
-    bool is_static;
-    bool is_public;
-    bool is_definition;
-    const char* body_start;
-    const char* body_end;
-} Method;
-
-typedef struct Structure {
-    char* name;
-    Method* methods;
-    int method_count;
-    char** implemented_traits;
-    int trait_count;
-    char* dependencies;
-    int dependency_count;
-    Structure* next;
-} Structure;
-
-typedef struct ExtractedDependency {
-    char* file_path;
-    char* target;
-    char* module_name;
-    Structure* structures;
-    int structure_count;
-    Method* methods;
-    int method_count;
-    LanguageType language;
-    AnalysisLayer layer;
-    struct ExtractedDependency* next;
-    struct ExtractedDependency* modules;
-} ExtractedDependency;
-
-typedef struct Dependency {
-    char* source;
-    char* target;
-    LanguageType language;
-    AnalysisLayer level;
-    Method* methods;
-    int method_count;
-    struct Dependency* next;
-} Dependency;
 
 // Language-specific syntax patterns for each layer
 typedef struct {
@@ -146,9 +53,6 @@ typedef struct {
     int follow_external;     // Whether to analyze external dependencies
 } AnalysisConfig;
 
-// Function prototypes for multi-layer analysis
-ExtractedDependency* analyze_file(const char* file_path, AnalysisConfig* config);
-
 // Language-specific analyzers
 typedef struct {
     ExtractedDependency* (*analyzeModule)(const char* content);
@@ -156,46 +60,9 @@ typedef struct {
     Method* (*analyzeMethod)(const char* content);
 } LanguageAnalyzer;
 
-// Helper functions for relationship mapping
-typedef struct {
-    char* from;
-    char* to;
-    char* relationship_type;  // "inherits", "implements", "uses", etc.
-    AnalysisLayer layer;
-} Relationship;
+// Language type functions
+LanguageType languageType(const char* filename);
+const char* languageName(LanguageType type);
 
-// Graph generation helpers
-typedef struct {
-    Relationship** relationships;
-    int relationship_count;
-    AnalysisLayer current_layer;
-} DependencyGraph;
-
-// Function prototypes for graph generation
-DependencyGraph* create_dependency_graph(ExtractedDependency** deps, int dep_count);
-void exportGraph(DependencyGraph* graph, const char* format, const char* output_path);
-void freeStructures(Structure* structs);
-extern void freeMethods(Method* methods);
-void freeDependency(ExtractedDependency* dep);
-
-typedef struct MethodReference {
-    char* called_in;
-    struct MethodReference* next;
-} MethodReference;
-
-typedef struct MethodDependency {
-    char* name;
-    struct MethodDependency* next;
-} MethodDependency;
-
-typedef struct MethodDefinition {
-    char* name;
-    char* return_type;
-    char* defined_in;
-    MethodDependency* dependencies;  // Changed to linked list
-    size_t param_count;
-    MethodReference* references;
-    size_t reference_count;
-} MethodDefinition;
 
 #endif // SYNTAXES_H

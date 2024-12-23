@@ -4,16 +4,6 @@
 #include "syntaxes.h"
 #include "grammars.h"
 
-// Structure definition tracking
-typedef struct {
-    char* name;
-    char* type;
-    char* defined_in;
-    int reference_count;
-    char** referenced_in;
-    size_t max_references;
-} StructureDefinition;
-
 extern StructureDefinition* structure_definitions;
 extern size_t structure_def_count;
 
@@ -25,34 +15,6 @@ typedef struct ScopeContext {
     int brace_depth;    
 } ScopeContext;
 
-
-extern MethodDefinition* method_definitions;
-extern size_t method_def_count;
-
-// Core analysis functions
 ExtractedDependency* analyzeModule(const char* content, const LanguageGrammar* grammar);
-Structure* analyze_structure(const char* content, const char* file_path, const LanguageGrammar* grammar);
-Method* analyzeMethod(const char* file_path, const char* content, const LanguageGrammar* grammar);
-
-// Structure tracking functions
-void collectStructures(const char* file_path, const char* content, const LanguageGrammar* grammar);
-StructureDefinition* get_structure_definitions(size_t* count);
-
-// Method tracking functions
-void collectDefinitions(const char* file_path, const char* content, const LanguageGrammar* grammar);
-
-// Dependency conversion helpers
-Dependency* create_dependency_from_extracted(ExtractedDependency* extracted);
-void graphDependency(Dependency* graph, ExtractedDependency* extracted);
-void freeExtractedDep(ExtractedDependency* dep);
-
-// Add these if they're not already present
-void freeMethod_references(MethodReference* refs);
-void freeMethod_definitions(void);
-int countMethods(Method* methods);
-
-// Add these declarations
-char* formatMethodSignature(Method* method);
-MethodDefinition* findMethodDefinition(const char* method_name);
 
 #endif // ANALYZERS_H

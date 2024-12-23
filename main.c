@@ -141,7 +141,7 @@ int main(int argc, char* argv[]) {
 
     // Create crawler instance
     printf("Creating crawler instance...\n");
-    DependencyCrawler* crawler = create_crawler(options.directories, 
+    DependencyCrawler* crawler = createCrawler(options.directories, 
                                               options.dir_count, 
                                               &config);
     if (!crawler) {

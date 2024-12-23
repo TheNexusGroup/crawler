@@ -198,7 +198,9 @@ static const char* C_KEYWORDS[] = {
 };
 
 static const char* C_TYPES[] = {
-    "void", "int", "float", "double", "char", "bool", "struct", "enum", "union", "typedef", "void*", "int*", "float*", "double*", "char*", "bool*", "struct*", "enum*", "union*", "typedef*"
+    "void", "int", "float", "double", "char", "bool", "struct", "enum", "union", 
+    "typedef", "void*", "int*", "float*", "double*", "char*", "bool*", "struct*", 
+    "enum*", "union*", "typedef*"
 };
 
 static const char* C_PREFIXES[] = {

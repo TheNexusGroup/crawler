@@ -3,7 +3,6 @@
 #include "logger.h"
 #include <stddef.h>
 
-// Define the actual array
 const LanguageGrammar LANGUAGE_GRAMMARS[] = {
     // Rust
     {
