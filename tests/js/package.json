@@ -1,0 +1,11 @@
+{
+  "name": "crawler-test-js",
+  "version": "1.0.0",
+  "description": "JavaScript test project for dependency crawler",
+  "main": "index.js",
+  "type": "module",
+  "dependencies": {
+    "express": "^4.18.0",
+    "lodash": "^4.17.21"
+  }
+}

@@ -16,5 +16,7 @@ typedef struct ScopeContext {
 } ScopeContext;
 
 ExtractedDependency* analyzeModule(const char* content, const LanguageGrammar* grammar);
+ExtractedDependency* analyzeModuleWithFile(const char* content, const char* file_path, const LanguageGrammar* grammar);
+ExtractedDependency* analyzeModuleGeneric(const char* content, const char* file_path, const LanguageGrammar* grammar);
 
 #endif // ANALYZERS_H

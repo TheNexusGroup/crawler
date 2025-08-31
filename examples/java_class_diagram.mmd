@@ -1,0 +1,174 @@
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor': '#4f46e5', 'primaryTextColor': '#fff', 'primaryBorderColor': '#3730a3', 'lineColor': '#374151', 'secondaryColor': '#06b6d4', 'tertiaryColor': '#f3f4f6'}}}%%
+
+classDiagram
+    class CrawlerTestApplication {
+        -UserService userService
+        -NotificationService notificationService
+        -UserRepository userRepository
+        -ApplicationConfig applicationConfig
+        +main(String[] args)
+        +run(String... args)
+        -executeSampleWorkflow()
+        -createSampleUser(String email, String username, String firstName, String lastName, Role role)
+        -demonstrateUserServiceOperations()
+        -demonstrateServiceInteractions(User adminUser, User regularUser, User moderatorUser)
+        -demonstrateRepositoryOperations()
+    }
+
+    class UserService {
+        <<interface>>
+        +createUser(User user) User
+        +findActiveUsers() List~User~
+        +findUsersByRole(Role role) List~User~
+        +canUserPerformAction(Long userId, String action) boolean
+        +getUserStatistics() UserStatistics
+        +promoteUserToModerator(Long userId) void
+        +sendBulkNotification(List~Long~ userIds, String message) void
+    }
+
+    class UserServiceImpl {
+        -UserRepository userRepository
+        -NotificationService notificationService
+        -UserValidator userValidator
+        -CacheManager cacheManager
+        +createUser(User user) User
+        +findActiveUsers() List~User~
+        +findUsersByRole(Role role) List~User~
+        +canUserPerformAction(Long userId, String action) boolean
+        +getUserStatistics() UserStatistics
+        +promoteUserToModerator(Long userId) void
+        +sendBulkNotification(List~Long~ userIds, String message) void
+    }
+
+    class NotificationService {
+        <<interface>>
+        +sendWelcomeNotification(User user) void
+        +sendAdminWelcomeNotification(User user) void
+        +sendPromotionNotification(User user) void
+        +sendBulkNotification(List~User~ users, String message) void
+    }
+
+    class NotificationServiceImpl {
+        -EmailService emailService
+        -SMSService smsService
+        -PushNotificationService pushService
+        -UserService userService
+        +sendWelcomeNotification(User user) void
+        +sendAdminWelcomeNotification(User user) void
+        +sendPromotionNotification(User user) void
+        +sendBulkNotification(List~User~ users, String message) void
+    }
+
+    class UserRepository {
+        <<interface>>
+        +save(User user) User
+        +findById(Long id) Optional~User~
+        +findAll() List~User~
+        +findByStatus(Status status) List~User~
+        +findUsersCreatedInLastDays(int days) List~User~
+        +findUsersWithPendingNotifications() List~User~
+        +countByStatus(Status status) long
+        +findByRoleIn(List~Role~ roles) List~User~
+    }
+
+    class JpaUserRepository {
+        <<extends JpaRepository>>
+        +save(User user) User
+        +findById(Long id) Optional~User~
+        +findAll() List~User~
+        +findByStatus(Status status) List~User~
+        +findUsersCreatedInLastDays(int days) List~User~
+        +findUsersWithPendingNotifications() List~User~
+        +countByStatus(Status status) long
+        +findByRoleIn(List~Role~ roles) List~User~
+    }
+
+    class User {
+        -Long id
+        -String email
+        -String username
+        -String firstName
+        -String lastName
+        -Role role
+        -Status status
+        -boolean emailVerified
+        -LocalDateTime createdAt
+        -LocalDateTime updatedAt
+        +getId() Long
+        +getEmail() String
+        +getUsername() String
+        +getFullName() String
+        +getRole() Role
+        +getStatus() Status
+        +isActive() boolean
+        +isAdmin() boolean
+        +canPerform(String action) boolean
+    }
+
+    class Role {
+        <<enumeration>>
+        USER
+        MODERATOR
+        ADMIN
+        SUPER_ADMIN
+        +getLevel() int
+        +getPermissions() List~String~
+        +canManage(Role other) boolean
+    }
+
+    class Status {
+        <<enumeration>>
+        ACTIVE
+        INACTIVE
+        SUSPENDED
+        DELETED
+        +isActive() boolean
+    }
+
+    class UserStatistics {
+        -long totalUsers
+        -long activeUsers
+        -long inactiveUsers
+        -Map~Role, Long~ usersByRole
+        +getTotalUsers() long
+        +getActiveUsers() long
+        +getInactiveUsers() long
+        +getUsersByRole() Map~Role, Long~
+    }
+
+    class ApplicationConfig {
+        -DataSource dataSource
+        -String jwtSecret
+        -long sessionTimeout
+        +dataSource() DataSource
+        +userService() UserService
+        +notificationService() NotificationService
+    }
+
+    %% Relationships
+    CrawlerTestApplication --> UserService : uses
+    CrawlerTestApplication --> NotificationService : uses
+    CrawlerTestApplication --> UserRepository : uses
+    CrawlerTestApplication --> ApplicationConfig : configures
+
+    UserServiceImpl ..|> UserService : implements
+    NotificationServiceImpl ..|> NotificationService : implements
+    JpaUserRepository ..|> UserRepository : implements
+
+    UserService --> User : manages
+    UserService --> UserStatistics : produces
+    NotificationService --> User : notifies
+
+    User --> Role : has
+    User --> Status : has
+
+    UserServiceImpl --> UserRepository : depends on
+    UserServiceImpl --> NotificationService : depends on
+    NotificationServiceImpl --> UserService : depends on
+
+    %% Notes
+    note for CrawlerTestApplication "Main Spring Boot application\nDemonstrates dependency injection\nand service layer patterns"
+
+    note for User "JPA Entity with validation\nSupports role-based permissions\nAudited with timestamps"
+
+    note for UserService "Service layer abstraction\nHandles business logic\nTransactional operations"

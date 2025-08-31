@@ -1,0 +1,54 @@
+# frozen_string_literal: true
+
+source 'https://rubygems.org'
+
+ruby '3.2.0'
+
+gem 'rails', '~> 7.0.0'
+gem 'pg', '~> 1.4'
+gem 'redis', '~> 5.0'
+gem 'sidekiq', '~> 7.0'
+
+# Authentication & Authorization
+gem 'devise', '~> 4.9'
+gem 'cancancan', '~> 3.5'
+
+# API
+gem 'grape', '~> 1.7'
+gem 'grape-entity', '~> 0.10'
+
+# Background Processing
+gem 'whenever', '~> 1.0'
+
+# Configuration
+gem 'figaro', '~> 1.2'
+
+# Monitoring & Logging
+gem 'lograge', '~> 0.12'
+gem 'newrelic_rpm', '~> 8.16'
+
+# Utilities
+gem 'dry-validation', '~> 1.10'
+gem 'dry-monads', '~> 1.6'
+
+group :development, :test do
+  gem 'rspec-rails', '~> 6.0'
+  gem 'factory_bot_rails', '~> 6.2'
+  gem 'faker', '~> 3.0'
+  gem 'pry-rails', '~> 0.3'
+  gem 'rubocop', '~> 1.50', require: false
+  gem 'rubocop-rails', '~> 2.19', require: false
+  gem 'rubocop-rspec', '~> 2.20', require: false
+end
+
+group :development do
+  gem 'listen', '~> 3.8'
+  gem 'spring', '~> 4.1'
+  gem 'spring-watcher-listen', '~> 2.1'
+end
+
+group :test do
+  gem 'simplecov', '~> 0.22', require: false
+  gem 'vcr', '~> 6.1'
+  gem 'webmock', '~> 3.18'
+end

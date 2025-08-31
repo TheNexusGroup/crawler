@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "crawler.h"
 #include "syntax_map.h"
 #include "syntaxes.h"
@@ -7,6 +8,8 @@
 #include <sys/stat.h>
 #include "logger.h"
 #include <ctype.h>
+#include <string.h>
+#include <strings.h>
 
 // Add these after includes
 static void processFile(DependencyCrawler* crawler, const char* file_path);

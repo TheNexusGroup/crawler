@@ -1,0 +1,89 @@
+digraph python_dependencies {
+  rankdir=TB;
+  node [shape=box, style=rounded];
+  edge [arrowhead=vee];
+  
+  // Configure layout
+  splines=ortho;
+  nodesep=0.6;
+  ranksep=0.8;
+  
+  // External libraries
+  subgraph cluster_external {
+    label="External Dependencies";
+    style=filled;
+    fillcolor=lightgray;
+    
+    "asyncio" [color="red", shape="ellipse"];
+    "dataclasses" [color="red", shape="ellipse"];
+    "typing" [color="red", shape="ellipse"];
+    "datetime" [color="red", shape="ellipse"];
+  }
+  
+  // Internal modules
+  subgraph cluster_internal {
+    label="Internal Modules";
+    style=filled;
+    fillcolor=lightblue;
+    
+    "main.py" [color="blue"];
+    "user.py" [color="yellow"];
+    "user_service.py" [color="green"];
+    "notification_service.py" [color="green"];
+    "cache_service.py" [color="green"];
+    "database_connection.py" [color="orange"];
+    "logger.py" [color="purple"];
+    "config.py" [color="gray"];
+  }
+  
+  // Decorators and utilities
+  subgraph cluster_utils {
+    label="Utils & Decorators";
+    style=filled;
+    fillcolor=lightyellow;
+    
+    "timing_decorator.py" [color="cyan"];
+    "cached_decorator.py" [color="cyan"];
+    "validation.py" [color="cyan"];
+  }
+  
+  // Module dependencies
+  "main.py" -> "user_service.py";
+  "main.py" -> "notification_service.py";
+  "main.py" -> "user.py";
+  "main.py" -> "database_connection.py";
+  "main.py" -> "logger.py";
+  "main.py" -> "config.py";
+  "main.py" -> "timing_decorator.py";
+  "main.py" -> "cached_decorator.py";
+  
+  // External dependencies
+  "main.py" -> "asyncio" [color="red"];
+  "main.py" -> "dataclasses" [color="red"];
+  "main.py" -> "typing" [color="red"];
+  
+  // Service dependencies
+  "user_service.py" -> "user.py";
+  "user_service.py" -> "database_connection.py";
+  "user_service.py" -> "cache_service.py";
+  "user_service.py" -> "logger.py";
+  "user_service.py" -> "validation.py";
+  "user_service.py" -> "asyncio" [color="red"];
+  
+  "notification_service.py" -> "user.py";
+  "notification_service.py" -> "user_service.py";
+  "notification_service.py" -> "logger.py";
+  "notification_service.py" -> "asyncio" [color="red"];
+  
+  // Model dependencies
+  "user.py" -> "typing" [color="red"];
+  "user.py" -> "datetime" [color="red"];
+  "user.py" -> "dataclasses" [color="red"];
+  "user.py" -> "validation.py";
+  "user.py" -> "cached_decorator.py";
+  
+  // Utility dependencies
+  "logger.py" -> "datetime" [color="red"];
+  "cache_service.py" -> "asyncio" [color="red"];
+  "database_connection.py" -> "asyncio" [color="red"];
+}

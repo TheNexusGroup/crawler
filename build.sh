@@ -2,8 +2,8 @@
 
 # Build configuration
 CC=gcc
-CFLAGS="-Wall -Wextra -I./src"
-LDFLAGS=""
+CFLAGS="-Wall -Wextra -O2 -I./src -std=c99 -pthread"
+LDFLAGS="-pthread -lm"
 BUILD_DIR="build"
 SRC_DIR="src"
 
@@ -23,6 +23,10 @@ SOURCES=(
     "src/syntaxes.c"
     "src/grammars.c"
     "src/pattern_cache.c"
+    "src/structure.c"
+    "src/dependency.c"
+    "src/output_formatter.c"
+    "src/language_analyzers.c"
     "main.c"
     "src/logger.c"
 )

@@ -8,13 +8,47 @@
 #include <ctype.h>
 #include <limits.h>
 
-// Add this implementation after the existing functions
+#include "language_analyzers.h"
+
+// Enhanced module analyzer that uses language-specific analyzers
 ExtractedDependency* analyzeModule(const char* content, const LanguageGrammar* grammar) {
-    if (!content || !grammar) {
+    return analyzeModuleWithFile(content, "unknown", grammar);
+}
+
+ExtractedDependency* analyzeModuleWithFile(const char* content, const char* file_path, const LanguageGrammar* grammar) {
+    if (!content || !grammar || !file_path) {
         logr(ERROR, "[Analyzer] Invalid parameters for module analysis");
         return NULL;
     }
 
+    logr(DEBUG, "[Analyzer] Analyzing %s with language-specific analyzer", languageName(grammar->type));
+
+    // Use language-specific analyzers for better accuracy
+    switch (grammar->type) {
+        case LANG_RUST:
+            return analyze_rust(content, file_path, grammar);
+        case LANG_C:
+            return analyze_c_cpp(content, file_path, grammar);
+        case LANG_JAVASCRIPT:
+            return analyze_javascript(content, file_path, grammar);
+        case LANG_PYTHON:
+            return analyze_python(content, file_path, grammar);
+        case LANG_JAVA:
+            return analyze_java(content, file_path, grammar);
+        case LANG_GO:
+            return analyze_go(content, file_path, grammar);
+        case LANG_PHP:
+            return analyze_php(content, file_path, grammar);
+        case LANG_RUBY:
+            return analyze_ruby(content, file_path, grammar);
+        default:
+            logr(WARN, "[Analyzer] No specific analyzer for language %d, using generic", grammar->type);
+            return analyzeModuleGeneric(content, file_path, grammar);
+    }
+}
+
+// Generic fallback analyzer for unsupported languages
+ExtractedDependency* analyzeModuleGeneric(const char* content, const char* file_path, const LanguageGrammar* grammar) {
     ExtractedDependency* head = NULL;
     ExtractedDependency* current = NULL;
 
@@ -45,6 +79,7 @@ ExtractedDependency* analyzeModule(const char* content, const LanguageGrammar* g
             memset(dep, 0, sizeof(ExtractedDependency));
             dep->module_name = module_name;
             dep->target = strdup(module_name);
+            dep->file_path = strdup(file_path);
             dep->layer = LAYER_MODULE;
             dep->next = NULL;
 

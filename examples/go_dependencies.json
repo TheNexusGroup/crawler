@@ -1,0 +1,206 @@
+{
+  "dependencies": [
+    {
+      "layer": "MODULE",
+      "connection_type": "IMPORT",
+      "module_name": "github.com/gin-gonic/gin",
+      "target": "github.com/gin-gonic/gin",
+      "file_path": "tests/go/main.go",
+      "external": true,
+      "category": "web_framework"
+    },
+    {
+      "layer": "MODULE",
+      "connection_type": "IMPORT", 
+      "module_name": "github.com/go-redis/redis/v8",
+      "target": "github.com/go-redis/redis/v8",
+      "file_path": "tests/go/main.go",
+      "external": true,
+      "category": "database"
+    },
+    {
+      "layer": "MODULE",
+      "connection_type": "IMPORT",
+      "module_name": "gorm.io/gorm",
+      "target": "gorm.io/gorm", 
+      "file_path": "tests/go/main.go",
+      "external": true,
+      "category": "orm"
+    },
+    {
+      "layer": "MODULE",
+      "connection_type": "IMPORT",
+      "module_name": "context",
+      "target": "context",
+      "file_path": "tests/go/main.go",
+      "external": false,
+      "category": "standard_library"
+    },
+    {
+      "layer": "MODULE",
+      "connection_type": "IMPORT",
+      "module_name": "fmt",
+      "target": "fmt",
+      "file_path": "tests/go/main.go", 
+      "external": false,
+      "category": "standard_library"
+    },
+    {
+      "layer": "MODULE",
+      "connection_type": "IMPORT",
+      "module_name": "net/http",
+      "target": "net/http",
+      "file_path": "tests/go/main.go",
+      "external": false,
+      "category": "standard_library"
+    },
+    {
+      "layer": "MODULE",
+      "connection_type": "INTERNAL_IMPORT",
+      "module_name": "github.com/crawler/test-go/internal/api",
+      "target": "internal/api",
+      "file_path": "tests/go/main.go",
+      "external": false,
+      "category": "internal"
+    },
+    {
+      "layer": "MODULE",
+      "connection_type": "INTERNAL_IMPORT",
+      "module_name": "github.com/crawler/test-go/internal/config",
+      "target": "internal/config",
+      "file_path": "tests/go/main.go",
+      "external": false,
+      "category": "internal"
+    },
+    {
+      "layer": "MODULE",
+      "connection_type": "INTERNAL_IMPORT",
+      "module_name": "github.com/crawler/test-go/internal/services",
+      "target": "internal/services",
+      "file_path": "tests/go/main.go",
+      "external": false,
+      "category": "internal"
+    },
+    {
+      "layer": "STRUCT",
+      "connection_type": "DEFINITION",
+      "module_name": "Application",
+      "target": "Application",
+      "file_path": "tests/go/main.go",
+      "methods": [
+        {
+          "name": "NewApplication",
+          "return_type": "*Application",
+          "visibility": "public",
+          "parameters": []
+        },
+        {
+          "name": "Initialize", 
+          "return_type": "error",
+          "visibility": "public",
+          "parameters": []
+        },
+        {
+          "name": "Start",
+          "return_type": "error", 
+          "visibility": "public",
+          "parameters": []
+        },
+        {
+          "name": "Shutdown",
+          "return_type": "error",
+          "visibility": "public", 
+          "parameters": ["ctx context.Context"]
+        }
+      ],
+      "fields": [
+        {
+          "name": "config",
+          "type": "*config.Config",
+          "visibility": "private"
+        },
+        {
+          "name": "logger",
+          "type": "logger.Logger",
+          "visibility": "private"
+        },
+        {
+          "name": "db",
+          "type": "database.Database",
+          "visibility": "private"
+        },
+        {
+          "name": "userSvc",
+          "type": "services.UserService",
+          "visibility": "private"
+        }
+      ]
+    },
+    {
+      "layer": "METHOD",
+      "connection_type": "FUNCTION_CALL",
+      "module_name": "main",
+      "target": "NewApplication",
+      "file_path": "tests/go/main.go",
+      "caller": "main",
+      "parameters": [],
+      "return_type": "*Application"
+    },
+    {
+      "layer": "METHOD",
+      "connection_type": "METHOD_CALL", 
+      "module_name": "Initialize",
+      "target": "config.Load",
+      "file_path": "tests/go/main.go",
+      "receiver": "app",
+      "parameters": [],
+      "return_type": "(*config.Config, error)"
+    },
+    {
+      "layer": "METHOD",
+      "connection_type": "METHOD_CALL",
+      "module_name": "Start",
+      "target": "server.ListenAndServe", 
+      "file_path": "tests/go/main.go",
+      "receiver": "app",
+      "parameters": [],
+      "return_type": "error"
+    }
+  ],
+  "metadata": {
+    "generated_at": "2024-08-31T06:50:00Z",
+    "total_dependencies": 13,
+    "format_version": "1.0",
+    "go_module": "github.com/crawler/test-go",
+    "go_version": "1.21",
+    "analysis_layers": ["MODULE", "STRUCT", "METHOD"],
+    "statistics": {
+      "external_dependencies": 3,
+      "standard_library_imports": 3, 
+      "internal_packages": 3,
+      "total_structs": 1,
+      "total_methods": 4,
+      "total_functions": 1
+    }
+  },
+  "package_analysis": {
+    "go.mod": {
+      "module_name": "github.com/crawler/test-go",
+      "go_version": "1.21",
+      "direct_dependencies": [
+        "github.com/gin-gonic/gin v1.9.1",
+        "github.com/go-redis/redis/v8 v8.11.5",
+        "gorm.io/driver/postgres v1.5.2", 
+        "gorm.io/gorm v1.25.4"
+      ]
+    },
+    "package_structure": {
+      "internal/api": ["handlers", "middleware", "routes"],
+      "internal/config": ["app_config", "database_config"],
+      "internal/database": ["connection", "migrations"],
+      "internal/services": ["user_service", "auth_service", "cache_service"],
+      "pkg/logger": ["structured_logger"],
+      "pkg/middleware": ["auth", "cors", "rate_limit"]
+    }
+  }
+}
